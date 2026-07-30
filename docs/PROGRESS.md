@@ -53,3 +53,18 @@
 **下一步（明确动作）**：编写 `docs/MESSAGE_PROTOCOL.md`——HOOKS 的前置依赖（`before_model_call`/`after_tool_call` 操作的就是消息）。定义与厂商无关的统一消息数据结构：角色、assistant 的思考+工具调用、tool 结果消息、序列化（供记忆/RAG/多agent/可观测消费）。
 
 **HOOKS.md 遗留待内核阶段敲定**：HookResult/ErrorAction 确切类型、优先级升降序与默认值、trace event 字段（与 MESSAGE_PROTOCOL 一起定）、死循环判定信号。
+
+---
+
+## 2026-07-30 · MESSAGE_PROTOCOL.md 完成
+
+**已完成**：
+- `docs/MESSAGE_PROTOCOL.md`：统一消息协议。四角色（system/user/assistant/tool）+ content 统一为内容块列表 + 三种块（text/tool_call/tool_result）+ call_id 配对 + 错误用 is_error 块 + metadata 模块命名空间隔离 + 序列化 + 历史。
+- 决策 #8：多工具结果内部用"一对一粒度"（一条 tool 消息一个结果块），合并/拆分交 provider。**经联网核实**：OpenAI 要求拆多条、Anthropic 要求并行结果合并进一条 user 消息（否则破坏并行机制）。
+- 决策 #9：确认联网方式——内置 web 工具不可用，走本地代理 `curl -x http://127.0.0.1:7890`（Clash，已实测连通）。
+
+**已确认可用的能力**：本地代理联网核实资料（写 provider 层时可用真实 API 文档/调用验证翻译逻辑）。
+
+**下一步（明确动作）**：编写 `docs/MODULES.md`——模块统一模板（外壳 + 只通过 Context 交互）+ 全局优先级表 + 模块总目录（RAG/记忆/规划/可观测/审批/预算/缓存等，体现"超多模块"，用不到可隐藏）。
+
+**MESSAGE_PROTOCOL 遗留待内核阶段敲定**：Message/ContentBlock 类型形式（dataclass vs pydantic）、id/call_id 生成方式（同步内核可复现约束）、未知块类型降级、metadata 大小上限。

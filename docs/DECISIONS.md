@@ -161,6 +161,23 @@
 
 **状态**：生效（依赖 owner 本地代理运行）。
 
+---
+
+## #10 · 2026-07-30 · 首个实现的 Provider：OpenAI 兼容
+
+**背景**：PROVIDER 接口按多 provider 设计，需定首个跑通的厂商。候选：Anthropic（协议最干净）/ OpenAI 兼容（生态最广）/ Ollama（零成本）。
+
+**决策**：首个实现 **OpenAI 兼容** provider，其余（Anthropic/Ollama）留骨架。
+
+**理由**：
+- 一份 OpenAI 兼容实现（允许自定义 base_url）可覆盖 OpenAI 官方 + 大量国内中转 + 开源兼容服务，owner 现有 key 可直接用。
+- 第一个里程碑即可真实跑通、看到反馈。
+
+**影响**：v0 最小内核用 OpenAI 兼容 provider 跑通对话与工具调用；ROADMAP 据此排里程碑。
+
+**状态**：生效。
+
+
 
 
 

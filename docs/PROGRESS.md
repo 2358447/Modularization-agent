@@ -80,3 +80,20 @@
 **下一步（明确动作）**：编写 `docs/PROVIDER.md`——provider 抽象接口。定义内核唯一依赖的统一接口（chat/流式/用量/能力声明）+ Message↔各厂商方言双向翻译（重点：Anthropic 并行结果聚合 见决策 #8）。可用本地代理核实真实 API 格式。先实现一家跑通，其余留骨架（首实现家待定）。
 
 **MODULES 遗留待内核阶段敲定**：Module 基类形式（ABC vs Protocol）、config 启用格式、依赖拓扑排序实现、模块共享区数据结构。
+
+---
+
+## 2026-07-30 · 设计阶段收尾（PROVIDER + ROADMAP 完成）
+
+**已完成**：
+- `docs/PROVIDER.md`：provider 抽象层。统一接口（chat/chat_stream 生成器/usage/capabilities）+ 双向翻译职责（含决策#8多工具聚合/拆分）+ 无原生工具厂商的 prompt 模拟 + 鉴权配置 + 先实现一家骨架其余。
+- `docs/ROADMAP.md`：实现路线图。两条总原则 + 通用验收标准（7条）+ 里程碑序列 M0→M1→M2→M3→M4+ + 状态跟踪表。
+- 决策 #10：首实现 provider = OpenAI 兼容。
+
+**里程碑概览**：M0 最小内核可对话(OpenAI) → M1 工具系统 → M2 钩子系统 → M3 模块系统+可观测 → M4+ 能力模块(压缩/RAG/记忆/审批预算/规划/多agent，顺序可调)。
+
+**阶段状态**：**六份设计文档全部完成**（ARCHITECTURE/HOOKS/MESSAGE_PROTOCOL/MODULES/PROVIDER/ROADMAP）。立项与设计阶段收尾。
+
+**下一步（明确动作）**：进入 **M0 最小内核**。开功能分支 `feat/m0-kernel-skeleton`，先产出该里程碑 CHEATSHEET，然后实现：Message(text块最小版) + Provider抽象+OpenAI兼容chat + 极简主循环(纯对话无工具) + 极简CLI + Context雏形。验收：CLI 多轮对话跑通。协作按 AB 混合：先一起敲定接口，核心逻辑 owner 填，我 review。
+
+**准备事项**：M0 开工前 owner 需准备 OpenAI 兼容的 API key + base_url（官方或中转），放入 `.env`（已被 gitignore 忽略）。

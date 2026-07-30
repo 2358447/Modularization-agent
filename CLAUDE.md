@@ -119,7 +119,7 @@ owner 是项目负责人，编程基础不错但 agent 领域是学习者。合�
 ## 六、当前进度指针
 
 **详见 `docs/PROGRESS.md`**（每次工作结束都要更新它）。
-一句话现状：**处于立项文档阶段，架构总纲已定，正在编写各细化设计文档，尚未开始写内核代码。**
+一句话现状：**六份设计文档全部完成，立项/设计阶段收尾；下一步进入 M0 最小内核（可对话，OpenAI 兼容），届时开首个功能分支 `feat/m0-kernel-skeleton`。**
 
 ---
 
@@ -131,8 +131,8 @@ owner 是项目负责人，编程基础不错但 agent 领域是学习者。合�
 | `docs/ARCHITECTURE.md` | 架构总纲（锚文档，先读） | 活 |
 | `docs/DECISIONS.md` | 重大决策日志 | 账本·只追加 |
 | `docs/PROGRESS.md` | 进度日志：现在在哪·下一步 | 账本·只追加 |
-| `docs/HOOKS.md` | 钩子点权威语义（待写） | 活 |
-| `docs/MESSAGE_PROTOCOL.md` | 消息数据结构（待写） | 活 |
-| `docs/MODULES.md` | 模块总目录+模板+优先级（待写） | 活 |
-| `docs/PROVIDER.md` | provider 抽象接口（待写） | 活 |
-| `docs/ROADMAP.md` | 实现顺序+验收标准（待写） | 活 |
+| `docs/HOOKS.md` | 钩子点权威语义 | 活 |
+| `docs/MESSAGE_PROTOCOL.md` | 消息数据结构 | 活 |
+| `docs/MODULES.md` | 模块总目录+模板+优先级 | 活 |
+| `docs/PROVIDER.md` | provider 抽象接口 | 活 |
+| `docs/ROADMAP.md` | 实现顺序+验收标准 | 活 |

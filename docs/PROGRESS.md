@@ -41,3 +41,15 @@
 **现状**：文档治理已形成完整闭环（读规则 + 写规则 + 分层加载 + 账本/活文档区分）。元层面工作全部结束。
 
 **下一步（明确动作）**：编写 `docs/HOOKS.md`——解决四个架构硬伤 A/B/C/D，并写入四道防线（沙箱化调用 / 失败降级 / 数据校验 / 可观测）。owner 已对三个拍板点表态：B 工具错误默认喂回模型、C 一个工具失败其余继续、D 三种中断意图（SKIP/HALT/REPLACE）认可。
+
+---
+
+## 2026-07-30 · HOOKS.md 完成
+
+**已完成**：
+- `docs/HOOKS.md`：钩子系统权威设计。10 个钩子点权威清单 + 观察者/拦截者权力分级 + 四硬伤解法（A 返回修改指令由内核施加、B 错误裁决 HALT>RETRY>FEED_MODEL、C 多工具串行各走钩子一个失败其余继续、D 中断三意图 SKIP/HALT/REPLACE）+ 四道防线 + 内核内建结构化事件流。
+- 决策 #7：活文档写作风格（客观、无对话痕迹），并据此清理了 HOOKS.md。
+
+**下一步（明确动作）**：编写 `docs/MESSAGE_PROTOCOL.md`——HOOKS 的前置依赖（`before_model_call`/`after_tool_call` 操作的就是消息）。定义与厂商无关的统一消息数据结构：角色、assistant 的思考+工具调用、tool 结果消息、序列化（供记忆/RAG/多agent/可观测消费）。
+
+**HOOKS.md 遗留待内核阶段敲定**：HookResult/ErrorAction 确切类型、优先级升降序与默认值、trace event 字段（与 MESSAGE_PROTOCOL 一起定）、死循环判定信号。

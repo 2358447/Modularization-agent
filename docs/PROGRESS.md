@@ -68,3 +68,15 @@
 **下一步（明确动作）**：编写 `docs/MODULES.md`——模块统一模板（外壳 + 只通过 Context 交互）+ 全局优先级表 + 模块总目录（RAG/记忆/规划/可观测/审批/预算/缓存等，体现"超多模块"，用不到可隐藏）。
 
 **MESSAGE_PROTOCOL 遗留待内核阶段敲定**：Message/ContentBlock 类型形式（dataclass vs pydantic）、id/call_id 生成方式（同步内核可复现约束）、未知块类型降级、metadata 大小上限。
+
+---
+
+## 2026-07-30 · MODULES.md 完成
+
+**已完成**：
+- `docs/MODULES.md`：模块系统。统一模板（name/hooks/tools/dependencies/setup/teardown + 回调统一签名 + 只走 Context）+ 加载生命周期 + 全局优先级分段（准备→注入→压缩→拦截→缓存→观察，附"注入须先于压缩"推演）+ 模块总目录（5类20个模块）+ 优先级登记表。
+- 确认分工：死循环检测作为独立模块（挂 on_iteration_start，可识别重复调用），内核最大迭代数作硬保底，两者互补。
+
+**下一步（明确动作）**：编写 `docs/PROVIDER.md`——provider 抽象接口。定义内核唯一依赖的统一接口（chat/流式/用量/能力声明）+ Message↔各厂商方言双向翻译（重点：Anthropic 并行结果聚合 见决策 #8）。可用本地代理核实真实 API 格式。先实现一家跑通，其余留骨架（首实现家待定）。
+
+**MODULES 遗留待内核阶段敲定**：Module 基类形式（ABC vs Protocol）、config 启用格式、依赖拓扑排序实现、模块共享区数据结构。

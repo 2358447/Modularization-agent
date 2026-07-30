@@ -1,127 +1,24 @@
 # PROGRESS — 进度日志
 
-> 账本文档，**只追加，永不删改**。每次工作结束追加一条。
-> 回到项目时，读**最新一条**即可续上：知道"刚做完什么、现在在哪、下一步做什么"。
+> 账本文档。回到项目时读**最新一条**即可续上：知道"刚做完什么、现在在哪、下一步做什么"。
 
 ---
 
-## 2026-07-30 · 立项文档阶段
+## 2026-07-30 · 立项与设计阶段完成
 
-**当前所处阶段**：立项 / 文档设计（尚未写任何内核代码）。
-
-**已完成**：
-- 协作契约、项目定位敲定（见 CLAUDE.md）
-- `docs/ARCHITECTURE.md` 架构总纲：三层结构、内核六大件、10 个钩子点、观察者/拦截者分级
-- 决策落档：#1 内核同步、#2 纳入 git、#3 文档分层治理
-- git 仓库初始化，`.gitignore` / `.gitattributes` 就位
-- `CLAUDE.md` 项目宪法就位
-
-**已知待解决的架构硬伤**（下一步要在 HOOKS.md 中解决）：
-- 🔴 A：拦截者"如何修改数据"缺乏约束机制（就地改 vs 返回新值，需定死）
-- 🔴 B：错误恢复策略无明确"责任人"（出错后重试/降级/终止由谁决定）
-- 🟡 C：并行工具调用语义（同步下串行执行，但"一次多个工具"的处理需明说）
-- 🟡 D：拦截中断如何传播（审批拒绝后：跳过工具？终止 run？告知模型？）
-- 🟢 F：可观测性宜作为内核一等公民（内核发结构化事件流），而非纯模块
-
-**下一步（明确动作）**：
-编写 `docs/HOOKS.md`，重点解决上述 A、B、C、D 四个控制流硬伤，给出：
-钩子权威清单语义 + 拦截者修改数据的确切机制 + 错误处理责任链 + 中断传播规则。
-
-**再往后**：MESSAGE_PROTOCOL.md → MODULES.md（含模块统一模板）→ PROVIDER.md → ROADMAP.md（实现顺序需具备"可讲述性"，便于将来开源当教程）→ 开始写最小内核。
+- 敲定项目定位、协作契约、架构铁律（见 CLAUDE.md）。
+- 完成六份设计文档：ARCHITECTURE（架构总纲）、HOOKS（钩子系统）、MESSAGE_PROTOCOL（消息协议）、MODULES（模块系统）、PROVIDER（provider 抽象）、ROADMAP（实现路线）。
+- 决策落档 #1–#10：同步内核、git 治理、文档分层、多工具结果一对一粒度、联网走本地代理、首实现 OpenAI 兼容、外部评审接纳等。
+- git 仓库、`.gitignore`/`.gitattributes` 就位。
 
 ---
 
-## 2026-07-30 · 文档治理闭环完成
+## 2026-07-30 · 文档整顿，重回代码正轨
 
-**已完成（承上条）**：
-- 文档三层加载规则（决策 #4）
-- 模块技术盲区速查惯例 CHEATSHEET（决策 #4）
-- 文档写入规则：改 vs 追加、写入触发时机、两条硬约束、兜底判断（决策 #5）
+- **诊断**：文档一度膨胀到 1753 行且 0 行代码，治理规则过度细化、后续路线被写死为"权威正文"，杜绝了踩坑学习的初衷。
+- **整顿**（决策 #11）：破例重写账本（合并原 #11–13 反复决策、压缩流水进度）；活文档中"写死后续路线"的部分降格为设计设想/实现参考；保留成熟的治理框架与全部设计内容。文档精简约一半。
+- **现状**：设计阶段收尾，元层工作结束，可开始写代码。
 
-**现状**：文档治理已形成完整闭环（读规则 + 写规则 + 分层加载 + 账本/活文档区分）。元层面工作全部结束。
+**下一步（明确动作）**：进入 **M0 最小内核**。开分支 `feat/m0-kernel-skeleton`，先出 CHEATSHEET，再实现：Message(text 块最小版) + Provider 抽象 + OpenAI 兼容 `chat` + 极简主循环(纯对话) + 极简 CLI + Context 雏形 + 内核持有 system prompt + CLI 捕获 Ctrl-C 优雅退出。验收：CLI 多轮对话跑通。协作按 AB 混合。
 
-**下一步（明确动作）**：编写 `docs/HOOKS.md`——解决四个架构硬伤 A/B/C/D，并写入四道防线（沙箱化调用 / 失败降级 / 数据校验 / 可观测）。owner 已对三个拍板点表态：B 工具错误默认喂回模型、C 一个工具失败其余继续、D 三种中断意图（SKIP/HALT/REPLACE）认可。
-
----
-
-## 2026-07-30 · HOOKS.md 完成
-
-**已完成**：
-- `docs/HOOKS.md`：钩子系统权威设计。10 个钩子点权威清单 + 观察者/拦截者权力分级 + 四硬伤解法（A 返回修改指令由内核施加、B 错误裁决 HALT>RETRY>FEED_MODEL、C 多工具串行各走钩子一个失败其余继续、D 中断三意图 SKIP/HALT/REPLACE）+ 四道防线 + 内核内建结构化事件流。
-- 决策 #7：活文档写作风格（客观、无对话痕迹），并据此清理了 HOOKS.md。
-
-**下一步（明确动作）**：编写 `docs/MESSAGE_PROTOCOL.md`——HOOKS 的前置依赖（`before_model_call`/`after_tool_call` 操作的就是消息）。定义与厂商无关的统一消息数据结构：角色、assistant 的思考+工具调用、tool 结果消息、序列化（供记忆/RAG/多agent/可观测消费）。
-
-**HOOKS.md 遗留待内核阶段敲定**：HookResult/ErrorAction 确切类型、优先级升降序与默认值、trace event 字段（与 MESSAGE_PROTOCOL 一起定）、死循环判定信号。
-
----
-
-## 2026-07-30 · MESSAGE_PROTOCOL.md 完成
-
-**已完成**：
-- `docs/MESSAGE_PROTOCOL.md`：统一消息协议。四角色（system/user/assistant/tool）+ content 统一为内容块列表 + 三种块（text/tool_call/tool_result）+ call_id 配对 + 错误用 is_error 块 + metadata 模块命名空间隔离 + 序列化 + 历史。
-- 决策 #8：多工具结果内部用"一对一粒度"（一条 tool 消息一个结果块），合并/拆分交 provider。**经联网核实**：OpenAI 要求拆多条、Anthropic 要求并行结果合并进一条 user 消息（否则破坏并行机制）。
-- 决策 #9：确认联网方式——内置 web 工具不可用，走本地代理 `curl -x http://127.0.0.1:7890`（Clash，已实测连通）。
-
-**已确认可用的能力**：本地代理联网核实资料（写 provider 层时可用真实 API 文档/调用验证翻译逻辑）。
-
-**下一步（明确动作）**：编写 `docs/MODULES.md`——模块统一模板（外壳 + 只通过 Context 交互）+ 全局优先级表 + 模块总目录（RAG/记忆/规划/可观测/审批/预算/缓存等，体现"超多模块"，用不到可隐藏）。
-
-**MESSAGE_PROTOCOL 遗留待内核阶段敲定**：Message/ContentBlock 类型形式（dataclass vs pydantic）、id/call_id 生成方式（同步内核可复现约束）、未知块类型降级、metadata 大小上限。
-
----
-
-## 2026-07-30 · MODULES.md 完成
-
-**已完成**：
-- `docs/MODULES.md`：模块系统。统一模板（name/hooks/tools/dependencies/setup/teardown + 回调统一签名 + 只走 Context）+ 加载生命周期 + 全局优先级分段（准备→注入→压缩→拦截→缓存→观察，附"注入须先于压缩"推演）+ 模块总目录（5类20个模块）+ 优先级登记表。
-- 确认分工：死循环检测作为独立模块（挂 on_iteration_start，可识别重复调用），内核最大迭代数作硬保底，两者互补。
-
-**下一步（明确动作）**：编写 `docs/PROVIDER.md`——provider 抽象接口。定义内核唯一依赖的统一接口（chat/流式/用量/能力声明）+ Message↔各厂商方言双向翻译（重点：Anthropic 并行结果聚合 见决策 #8）。可用本地代理核实真实 API 格式。先实现一家跑通，其余留骨架（首实现家待定）。
-
-**MODULES 遗留待内核阶段敲定**：Module 基类形式（ABC vs Protocol）、config 启用格式、依赖拓扑排序实现、模块共享区数据结构。
-
----
-
-## 2026-07-30 · 设计阶段收尾（PROVIDER + ROADMAP 完成）
-
-**已完成**：
-- `docs/PROVIDER.md`：provider 抽象层。统一接口（chat/chat_stream 生成器/usage/capabilities）+ 双向翻译职责（含决策#8多工具聚合/拆分）+ 无原生工具厂商的 prompt 模拟 + 鉴权配置 + 先实现一家骨架其余。
-- `docs/ROADMAP.md`：实现路线图。两条总原则 + 通用验收标准（7条）+ 里程碑序列 M0→M1→M2→M3→M4+ + 状态跟踪表。
-- 决策 #10：首实现 provider = OpenAI 兼容。
-
-**里程碑概览**：M0 最小内核可对话(OpenAI) → M1 工具系统 → M2 钩子系统 → M3 模块系统+可观测 → M4+ 能力模块(压缩/RAG/记忆/审批预算/规划/多agent，顺序可调)。
-
-**阶段状态**：**六份设计文档全部完成**（ARCHITECTURE/HOOKS/MESSAGE_PROTOCOL/MODULES/PROVIDER/ROADMAP）。立项与设计阶段收尾。
-
-**下一步（明确动作）**：进入 **M0 最小内核**。开功能分支 `feat/m0-kernel-skeleton`，先产出该里程碑 CHEATSHEET，然后实现：Message(text块最小版) + Provider抽象+OpenAI兼容chat + 极简主循环(纯对话无工具) + 极简CLI + Context雏形。验收：CLI 多轮对话跑通。协作按 AB 混合：先一起敲定接口，核心逻辑 owner 填，我 review。
-
-**准备事项**：M0 开工前 owner 需准备 OpenAI 兼容的 API key + base_url（官方或中转），放入 `.env`（已被 gitignore 忽略）。
-
----
-
-## 2026-07-30 · 处理外部设计评审
-
-**已完成**：
-- 收到并评估另一 AI 的设计评审（agent 工程角度，指出时序/短路/一致性类问题）。**全部条目接纳**，信噪比高。
-- owner 决定：分两批处理、评审原文不归档（结论记入决策 #11 留痕）。
-- **立即落地**：system prompt 归属（内核持有基础 system message，模块经 before_model_call 加工）→ MESSAGE_PROTOCOL §1.1。
-- 待落档清单全部记入决策 #11，并作为 M1/M2/M3/M4 的**开工前置**写进 ROADMAP（开对应分支前必须先落档，决策三件套）。
-
-**关键结论**：
-- M2 是项目成败点。开 `feat/m2-hooks` 前必须先落定 B1(逐个施加)/B4(短路规则)/B2(REPLACE泛化)/B3(流式降级)/B5(HALT历史补全)/T2/T3/T4。
-- M1 前落定 T1（call_id 透传厂商、内核不造；message.id 自增或 uuid4）。
-- M0 不受阻塞，可照常先行。
-
-**下一步（明确动作）**：进入 **M0 最小内核**（不受评审阻塞）。开分支 `feat/m0-kernel-skeleton`，先出 CHEATSHEET，再实现 Message(text块) + Provider抽象+OpenAI兼容chat + 极简主循环(纯对话) + 极简CLI + Context雏形 + 内核持有 system prompt。验收：CLI 多轮对话跑通。owner 需准备 OpenAI 兼容 key+base_url 入 .env。
-
----
-
-## 2026-07-30 · 完成 AI_ONBOARDING 接手引导
-
-**已完成**：
-- `docs/AI_ONBOARDING.md`：新 AI 接手启动器。含可粘贴提示词、上手须知、当前状态速览、项目一分钟理解、里程碑地图、最易踩的坑（5 条）、交叉评审惯例。
-- 纳入文档体系：CLAUDE.md 文档地图登记；写入规则表补充"收尾时更新 AI_ONBOARDING §2"。
-- 整个项目的"传承机制"完整闭环：CLAUDE.md(自动加载宪法) + AI_ONBOARDING(接手启动器) + PROGRESS(进度锚点) + DECISIONS(不可篡改的决策账本) + 活文档(按需查阅)。
-
-**下一步（明确动作）**：同上条——M0 最小内核。owner 备好 OpenAI 兼容 key+base_url 即可开工。
+**准备事项**：owner 备好 OpenAI 兼容的 API key + base_url，放入 `.env`（已被 gitignore 忽略）。

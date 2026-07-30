@@ -177,6 +177,41 @@
 
 **状态**：生效。
 
+---
+
+## #11 · 2026-07-30 · 外部设计评审的接纳与待落档清单
+
+**背景**：另一 AI 从 agent 工程角度评审了六份设计文档，指出一批"时序/短路/一致性"类问题。评审原文经 owner 决定不归档进仓库；采纳结论在此留痕（否则开 M2 前会遗忘，违背溯源原则）。分两批处理：M1(system prompt) 现在定；其余待对应里程碑前落档。
+
+**已接纳并立即落地**：
+- **system prompt 归属**（评审"疏漏M1"）：内核持有基础 system message（可配置/可空），模块经 before_model_call modify 加工。已写入 MESSAGE_PROTOCOL §1.1。M0 用到。
+
+**已接纳、待"开 feat/m2-hooks 分支前"落档（决策三件套）**——钩子机制类，M2 才落地：
+- **B1** 拦截链改为**逐个施加**：排序后每调用一个拦截者立即 validate+apply，后者看到前者结果（"先注入后压缩"才成立）。改 HOOKS §3。
+- **B4** 同钩子点**短路规则**：升序执行，第一个返回终止意图(SKIP/HALT/REPLACE)者胜出并短路其余，modify/None 不短路。由此 MODULES §3.3"缓存@400 排审批@300 之后"成立。改 HOOKS §3/§4。
+- **B2** REPLACE **泛化**为通用"短路真实调用+提供替代结果"意图，覆盖 before_model_call(响应缓存)与 before_tool_call(工具缓存)两处。改 HOOKS 硬伤D + MODULES §4.3。
+- **B3** 流式下 `after_model_call` **退化为纯观察者**，改响应类拦截者在流式下失效降级并记 trace；替换需求前移到 before_model_call 的 REPLACE。改 HOOKS §4 + PROVIDER §1.2 指回。
+- **B5** HALT 在多工具中途时，内核为**未执行的 tool_call 补 is_error 占位 tool_result**，保证 tool_call↔tool_result 配对、历史合法可续跑。改 HOOKS §C/硬伤D。
+- **T2** 补诚实限制：串行→并行需 Context 并发保护，非无缝替换。改 HOOKS §C 备注。
+- **T3** 澄清：模块 setup/teardown 绑**框架生命周期**（跨run存活）；run 边界的事用 on_run_start/end。改 MODULES §2.4。
+- **T4** 定清边界：钩子回调自崩→防线1处理不触发 on_error(防钩子风暴)；provider/工具/主循环崩→触发 on_error；on_error 处理器自崩→防线1兜住不递归。改 HOOKS §5。
+
+**已接纳、待 M1 前落档**：
+- **T1** 去除"同步内核不可用随机源/需可复现"的自造约束（决策#1不含确定性约束）：`message.id` 用自增计数器或 uuid4；`call_id` **透传厂商返回值**，内核不生成，prompt模拟的 provider 内部自造并保证同run唯一。改 MESSAGE_PROTOCOL §9。
+
+**已接纳、待对应里程碑就近补进 ROADMAP/活文档**：
+- **疏漏M2** token 计数：PROVIDER 增可选 count_tokens；拿不到用 tiktoken 近似并声明估算。压缩模块(M4)前置。
+- **疏漏M3** 用户 Ctrl-C：CLI 捕获 KeyboardInterrupt → 转内核级 HALT，复用 B5 历史补全。
+- **疏漏M4** M0–M3 上下文溢出属已知限制（超窗口由 provider 直接报错），ROADMAP 写明。
+- **疏漏M5** config 格式（YAML/TOML，声明启用模块+优先级覆盖）M3 开工优先敲定。
+
+**未采纳/降级**：无。评审全部条目接纳。补充：owner 与本 AI 一致认为 system prompt(疏漏M1) 时间紧迫度等同 Tier1（M0 即用），故提前至第一批。
+
+**理由**：评审信噪比高，所指均为真实的时序/一致性洞。分两批既不阻塞 M0/M1，又保证 M2 地基在开分支前补牢。
+
+**状态**：M1(system prompt) 生效；其余为"待落档清单"，在对应里程碑开工前转为正式修改。
+
+
 
 
 

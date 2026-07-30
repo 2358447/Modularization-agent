@@ -97,3 +97,20 @@
 **下一步（明确动作）**：进入 **M0 最小内核**。开功能分支 `feat/m0-kernel-skeleton`，先产出该里程碑 CHEATSHEET，然后实现：Message(text块最小版) + Provider抽象+OpenAI兼容chat + 极简主循环(纯对话无工具) + 极简CLI + Context雏形。验收：CLI 多轮对话跑通。协作按 AB 混合：先一起敲定接口，核心逻辑 owner 填，我 review。
 
 **准备事项**：M0 开工前 owner 需准备 OpenAI 兼容的 API key + base_url（官方或中转），放入 `.env`（已被 gitignore 忽略）。
+
+---
+
+## 2026-07-30 · 处理外部设计评审
+
+**已完成**：
+- 收到并评估另一 AI 的设计评审（agent 工程角度，指出时序/短路/一致性类问题）。**全部条目接纳**，信噪比高。
+- owner 决定：分两批处理、评审原文不归档（结论记入决策 #11 留痕）。
+- **立即落地**：system prompt 归属（内核持有基础 system message，模块经 before_model_call 加工）→ MESSAGE_PROTOCOL §1.1。
+- 待落档清单全部记入决策 #11，并作为 M1/M2/M3/M4 的**开工前置**写进 ROADMAP（开对应分支前必须先落档，决策三件套）。
+
+**关键结论**：
+- M2 是项目成败点。开 `feat/m2-hooks` 前必须先落定 B1(逐个施加)/B4(短路规则)/B2(REPLACE泛化)/B3(流式降级)/B5(HALT历史补全)/T2/T3/T4。
+- M1 前落定 T1（call_id 透传厂商、内核不造；message.id 自增或 uuid4）。
+- M0 不受阻塞，可照常先行。
+
+**下一步（明确动作）**：进入 **M0 最小内核**（不受评审阻塞）。开分支 `feat/m0-kernel-skeleton`，先出 CHEATSHEET，再实现 Message(text块) + Provider抽象+OpenAI兼容chat + 极简主循环(纯对话) + 极简CLI + Context雏形 + 内核持有 system prompt。验收：CLI 多轮对话跑通。owner 需准备 OpenAI 兼容 key+base_url 入 .env。

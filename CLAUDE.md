@@ -28,7 +28,7 @@
 | 触发时机 | 写操作 |
 |---------|--------|
 | 做了改变架构约定的决定 | 追加 DECISIONS 一条 + 改对应活文档 + commit（决策#3 三件套） |
-| 一个模块/一次工作收尾 | 追加 PROGRESS 一条（现在在哪+下一步）+ commit |
+| 一个模块/一次工作收尾 | 追加 PROGRESS 一条（现在在哪+下一步）+ 更新 AI_ONBOARDING §2 速览 + commit |
 | 代码改动使某活文档过时 | 立即改那份活文档（代码与文档不许脱节） |
 | 新开一个代码模块 | 建该模块的 `CHEATSHEET.md` |
 | 仅改错别字/小调整 | 只 commit，不碰 DECISIONS/PROGRESS |
@@ -128,6 +128,7 @@ owner 是项目负责人，编程基础不错但 agent 领域是学习者。合�
 | 文件 | 作用 | 类型 |
 |------|------|------|
 | `CLAUDE.md` | 本文件，协作契约+铁律+进度指针 | 活 |
+| `docs/AI_ONBOARDING.md` | 新 AI 接手启动器（含可粘贴提示词） | 活 |
 | `docs/ARCHITECTURE.md` | 架构总纲（锚文档，先读） | 活 |
 | `docs/DECISIONS.md` | 重大决策日志 | 账本·只追加 |
 | `docs/PROGRESS.md` | 进度日志：现在在哪·下一步 | 账本·只追加 |

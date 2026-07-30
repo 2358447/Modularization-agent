@@ -114,3 +114,14 @@
 - M0 不受阻塞，可照常先行。
 
 **下一步（明确动作）**：进入 **M0 最小内核**（不受评审阻塞）。开分支 `feat/m0-kernel-skeleton`，先出 CHEATSHEET，再实现 Message(text块) + Provider抽象+OpenAI兼容chat + 极简主循环(纯对话) + 极简CLI + Context雏形 + 内核持有 system prompt。验收：CLI 多轮对话跑通。owner 需准备 OpenAI 兼容 key+base_url 入 .env。
+
+---
+
+## 2026-07-30 · 完成 AI_ONBOARDING 接手引导
+
+**已完成**：
+- `docs/AI_ONBOARDING.md`：新 AI 接手启动器。含可粘贴提示词、上手须知、当前状态速览、项目一分钟理解、里程碑地图、最易踩的坑（5 条）、交叉评审惯例。
+- 纳入文档体系：CLAUDE.md 文档地图登记；写入规则表补充"收尾时更新 AI_ONBOARDING §2"。
+- 整个项目的"传承机制"完整闭环：CLAUDE.md(自动加载宪法) + AI_ONBOARDING(接手启动器) + PROGRESS(进度锚点) + DECISIONS(不可篡改的决策账本) + 活文档(按需查阅)。
+
+**下一步（明确动作）**：同上条——M0 最小内核。owner 备好 OpenAI 兼容 key+base_url 即可开工。

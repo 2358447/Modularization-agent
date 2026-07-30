@@ -96,5 +96,25 @@
 
 **状态**：生效。
 
+---
+
+## #6 · 2026-07-30 · Git 使用规则与分支策略
+
+**背景**：此前对 git 的要求散落各处，缺集中规则。owner 已创建 GitHub 远程仓库 `https://github.com/2358447/Modularization-agent`。
+
+**决策**：确立 git 规则，写入 `CLAUDE.md` 五·补节：
+1. 提交时机：一个逻辑完整改动 = 一个 commit；不把跑不起来的代码提交到 main。
+2. commit message 格式：`类型: 简述`（feat/fix/docs/refactor/test/chore）。
+3. **分支策略采用 A：main + 功能分支**。main 永远可运行；新模块/大改动走 `feat/<名字>` 分支，审过验收后合并回 main；合并点作为"章节里程碑"服务开源可讲述性。
+4. push：main 有实质更新即推 origin；对外发布若涉新目标需 owner 授权（推 origin/main 已授权）。
+5. 铁律：密钥走环境变量/.env，绝不进提交。
+
+**理由**：main+功能分支符合"一次一个模块"的节奏，天然形成里程碑历史，且是生产级协作标准姿势，owner 借此练习分支流程（届时配 CHEATSHEET）。
+
+**影响**：下一步写代码起即按此分支流程操作。
+
+**状态**：生效。
+
+
 
 

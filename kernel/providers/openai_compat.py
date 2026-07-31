@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import os
 
+import requests
+
 from kernel.message import Message
-from kernel.providers.base import Provider, Response
+from kernel.providers.base import APIError, Provider, Response
 
 
 class OpenAICompat(Provider):
@@ -27,18 +29,56 @@ class OpenAICompat(Provider):
         self.model = model or os.environ.get("OPENAI_MODEL", "gpt-3.5-turbo")
 
     def chat(self, messages: list[Message], **kwargs) -> Response:
-        """TODO: 实现真实 HTTP 调用。
+        """调用 OpenAI 兼容 /chat/completions 接口。
 
-        M0 骨架阶段返回固定 stub，便于端到端 hello-world。
+        Args:
+            messages: 对话历史。
+            **kwargs: provider 特定参数，例如 temperature、max_tokens、top_p 等，
+                会透传到请求 body。
+
+        Returns:
+            标准化后的 Response。
+
+        Raises:
+            APIError: 网络或 API 返回错误时抛出。
         """
-        # TODO: import requests
-        # TODO: POST {self.base_url}/chat/completions
-        # TODO: 构造 body：model + messages（调用每个 Message.to_dict()）
-        # TODO: parse JSON，提取 choices[0].message.content
-        # TODO: return Response(content=..., usage=..., model=..., finish_reason=...)
+        body = {
+            "model": self.model,
+            "messages": [m.to_dict() for m in messages],
+        }
+        # M0：把 kwargs 直接合并进 body，支持 temperature / max_tokens 等。
+        # 未来若需要参数白名单校验，可在这里扩展。
+        body.update(kwargs)
+
+        url = f"{self.base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            resp = requests.post(
+                url,
+                json=body,
+                headers=headers,
+                timeout=60,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.RequestException as exc:
+            raise APIError(f"OpenAI 兼容 provider 请求失败: {exc}") from exc
+        except ValueError as exc:
+            raise APIError(f"OpenAI 兼容 provider 返回非 JSON: {exc}") from exc
+
+        try:
+            choice = data["choices"][0]
+            reply_content = choice["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise APIError(f"OpenAI 兼容 provider 返回结构异常: {exc}") from exc
+
         return Response(
-            content="hello from stub",
-            usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-            model=self.model,
-            finish_reason="stop",
+            content=reply_content,
+            usage=data.get("usage"),
+            model=data.get("model"),
+            finish_reason=choice.get("finish_reason"),
         )

@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 
 import requests
+import base
 
 from kernel.message import Message
 from kernel.providers.base import Provider, Response
@@ -49,11 +50,20 @@ class OpenAICompat(Provider):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
-        resp = requests.post(url, json=body, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
-        choice = data["choices"][0]
-        reply_content = choice["message"]["content"]
+        try:
+          resp = requests.post(url, json=body, headers=headers, timeout=60)
+          resp.raise_for_status()
+          data = resp.json()
+        except requests.RequestException as exc:
+          raise base.APIError(f"OpenAI 兼容 provider 请求失败: {exc}") from exc
+        except ValueError as exc:
+          raise base.APIError(f"OpenAI 兼容 provider 返回非 JSON: {exc}") from exc
+
+        try:
+          choice = data["choices"][0]
+          reply_content = choice["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+          raise base.APIError(f"OpenAI 兼容 provider 返回结构异常: {exc}") from exc
 
         return Response(
             content=reply_content,
@@ -61,3 +71,4 @@ class OpenAICompat(Provider):
             model=data.get("model"),
             finish_reason=choice.get("finish_reason"),
         )
+

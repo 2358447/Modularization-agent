@@ -130,11 +130,52 @@
 - **出现位置**：`kernel/providers/openai_compat.py`。
 - **注意**：M0 不做白名单校验。未来若 provider 对参数敏感，可在这里加校验或过滤。
 
+---
 
-- **用途**：M0 不实现 HookManager，但要让主循环的关键位置可见，M1 直接替换函数体。
+## 9. `ProviderCapability` 能力声明
+
+- **用途**：让 provider 主动声明自己支持哪些能力（chat / stream / tool_use / count_tokens），内核在调用前可先检查，避免把不支持的请求发给 provider。
 - **最小例子**：
   ```python
-  def _emit(hook_name: str, ctx: Context) -> None:
-      pass  # M1 替换为 hook_manager.emit(hook_name, ctx)
+  from enum import Enum, auto
+
+  class ProviderCapability(Enum):
+      CHAT = auto()
+      STREAM = auto()
+      TOOL_USE = auto()
+      COUNT_TOKENS = auto()
+
+  class MyProvider(Provider):
+      def capabilities(self) -> set[ProviderCapability]:
+          return {ProviderCapability.CHAT, ProviderCapability.STREAM}
   ```
-- **出现位置**：`kernel/loop.py`。
+- **出现位置**：`kernel/providers/base.py`。
+
+---
+
+## 10. `ConfigurationError` / `UnsupportedCapabilityError`
+
+- **用途**：进一步细分 provider 异常。
+  - `ConfigurationError`：配置缺失（如 api_key 为空）。
+  - `UnsupportedCapabilityError`：调用了 provider 没声明支持的能力（如让不支持 tool_use 的 provider 执行工具）。
+- **最小例子**：
+  ```python
+  if not self.api_key:
+      raise ConfigurationError("OPENAI_API_KEY 未配置")
+
+  if ProviderCapability.TOOL_USE not in self.capabilities():
+      raise UnsupportedCapabilityError("本 provider 不支持 tool_use")
+  ```
+- **出现位置**：`kernel/providers/base.py`、`kernel/providers/openai_compat.py`（未来可补充校验）。
+
+---
+
+## 11. `count_tokens` 占位
+
+- **用途**：估算消息 token 数，用于预算模块或上下文溢出检测。M0 默认抛出 `UnsupportedCapabilityError`，子类可覆盖。
+- **最小例子**：
+  ```python
+  def count_tokens(self, messages: list[Message]) -> int:
+      raise UnsupportedCapabilityError("未实现")
+  ```
+- **出现位置**：`kernel/providers/base.py`。

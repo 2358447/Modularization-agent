@@ -26,8 +26,8 @@
 
 ## 2. 当前状态速览
 
-- **阶段**：六份设计文档完成、文档已整顿精简（决策 #11）。设计阶段收尾，元层工作结束，可开始写代码。
-- **下一步**：M0 最小内核（`feat/m0-kernel-skeleton`），打通"用户说话→OpenAI 兼容模型响应→CLI 显示"。owner 备好 key+base_url 即可开工。
+- **阶段**：M0 最小内核骨架已完成（`feat/m0-kernel-skeleton`），端到端 stub 跑通。
+- **下一步**：owner 逐文件填 TODO，从 `kernel/providers/openai_compat.py` 真实 HTTP 调用开始，再到 `message` / `context` / `loop` / `cli` 打磨。每填完一个文件一个 commit。最终用真实 key 验收 CLI 多轮对话。
 - **首个 provider**：OpenAI 兼容（决策 #9）。**内核**：同步实现（决策 #1）。
 - **设计文档的定位**：HOOKS §7 与 MODULES §3.2 等"后续机制"是**设计设想**，M2/实现阶段验证敲定，非必须照抄——保留了实现时的创作自由。
 - **权威进度**：始终以 `docs/PROGRESS.md` 最新一条为准（本节可能滞后）。

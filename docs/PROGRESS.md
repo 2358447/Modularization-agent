@@ -13,6 +13,18 @@
 
 ---
 
+## 2026-07-31 · M0 骨架完成（feat/m0-kernel-skeleton）
+
+- 切出功能分支 `feat/m0-kernel-skeleton`。
+- 完成 M0 骨架代码：`kernel/`（`message`、`context`、`hooks`、`loop`、`providers/base`、`providers/openai_compat`）+ `frontends/cli/main.py` + `kernel/CHEATSHEET.md` + `frontends/cli/CHEATSHEET.md` + `requirements.txt` + `.env.example`。
+- 关键架构选择：`loop.py` 中预埋空钩子广播（M1 接入 HookManager 时不改内核）；system prompt 可被环境变量 `AGENT_SYSTEM_PROMPT` 覆盖；OpenAI 兼容 provider 从环境变量读取配置。
+- 验收：`printf 'hi\nhello\n' | python -m frontends.cli.main` 跑通 stub 回复；Ctrl-C 优雅退出已注册。
+- 提交：`3620817 feat: M0 骨架（端到端 hello，所有真逻辑为 TODO）`；分支已推 origin。
+
+**下一步**：owner 逐文件填 TODO，从 `kernel/providers/openai_compat.py` 真实 HTTP 调用开始，再到 `message` / `context` / `loop` / `cli` 打磨。每填完一个文件一个 commit。填完后用真实 key 做 CLI 多轮对话验收。
+
+---
+
 ## 2026-07-30 · 文档整顿，重回代码正轨
 
 - **诊断**：文档一度膨胀到 1753 行且 0 行代码，治理规则过度细化、后续路线被写死为"权威正文"，杜绝了踩坑学习的初衷。

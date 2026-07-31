@@ -5,6 +5,8 @@ from __future__ import annotations
 import signal
 import sys
 
+from dotenv import load_dotenv
+
 from kernel.context import Context
 from kernel.loop import run
 from kernel.providers.openai_compat import OpenAICompat
@@ -18,6 +20,8 @@ def _on_sigint(_signum: int, _frame) -> None:
 
 def main() -> None:
     """CLI 入口。"""
+    load_dotenv()
+
     signal.signal(signal.SIGINT, _on_sigint)
 
     ctx = Context()

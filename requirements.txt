@@ -1,0 +1,2 @@
+# M0 最小依赖：OpenAI 兼容 provider 的 HTTP 调用
+requests>=2.31.0

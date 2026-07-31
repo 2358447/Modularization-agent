@@ -25,6 +25,19 @@
 
 ---
 
+## 2026-07-31 · M0 provider 与 CLI 收尾
+
+- 将 `kernel/providers/base.py` 回退到 M0 最简版本：仅保留 `Response` + `Provider.chat()` 抽象方法。
+- 清理 `kernel/providers/openai_compat.py`：删除过期 TODO、修正 PEP 8 格式，保留真实 HTTP 调用；不添加错误包装、`kwargs` 透传、`timeout`。
+- CLI 增加 `.env` 自动加载：`requirements.txt` 引入 `python-dotenv`，`frontends/cli/main.py` 启动时调用 `load_dotenv()`。
+- 验证：`printf '你好\\n' | python -m frontends.cli.main` 成功调用 DeepSeek 并返回真实回复。
+- `kernel/CHEATSHEET.md` 同步回退到 M0 范围。
+- 分支 `feat/m0-kernel-skeleton` 已推 origin；当前提交 `5191a2d`。
+
+**下一步**：继续填 M0 其余 TODO——`message.py` / `context.py` / `loop.py` / `cli/main.py` 的细节打磨与错误处理。
+
+---
+
 ## 2026-07-30 · 文档整顿，重回代码正轨
 
 - **诊断**：文档一度膨胀到 1753 行且 0 行代码，治理规则过度细化、后续路线被写死为"权威正文"，杜绝了踩坑学习的初衷。

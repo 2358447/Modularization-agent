@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from kernel.context import Context
 from kernel.loop import run
+from kernel.providers.base import APIError
 from kernel.providers.openai_compat import OpenAICompat
 
 
@@ -37,9 +38,11 @@ def main() -> None:
 
         if not user_input:
             continue
-
-        reply = run(user_input, ctx, provider)
-        print(reply)
+        try:
+            reply = run(user_input, ctx, provider)
+            print(reply)
+        except APIError as exc:
+            print(f"[错误] {exc}")
 
 
 if __name__ == "__main__":

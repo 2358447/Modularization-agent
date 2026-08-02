@@ -7,7 +7,7 @@ import os
 from kernel.context import Context
 from kernel.hooks import Hook
 from kernel.message import Message
-from kernel.providers.base import Provider
+from kernel.providers.base import APIError, Provider
 
 
 # 内核默认 system prompt；可被环境变量覆盖，也可由调用方传入。
@@ -56,8 +56,12 @@ def run(
 
     _emit(Hook.ON_ITERATION_START, ctx)
     _emit(Hook.BEFORE_MODEL_CALL, ctx)
-
-    response = provider.chat(ctx.history)
+    try:
+        response = provider.chat(ctx.history)
+    except APIError as exc:
+        ctx.history.pop()  # 移除最后一条用户消息，避免重复
+        ctx.iter_count -= 1
+        raise
 
     _emit(Hook.AFTER_MODEL_CALL, ctx)
 

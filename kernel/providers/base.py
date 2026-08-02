@@ -25,6 +25,10 @@ class Response:
     finish_reason: str | None = None
 
 
+class APIError(Exception):
+    """Provider 调用过程中的请求或解析错误。"""
+
+
 class Provider(ABC):
     """统一大模型调用接口。内核只依赖此接口。"""
 

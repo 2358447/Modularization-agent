@@ -1,3 +1,6 @@
 # M0 最小依赖：OpenAI 兼容 provider 的 HTTP 调用
 requests>=2.31.0
 python-dotenv>=1.0.0
+
+# 开发/测试依赖
+pytest>=8.0.0

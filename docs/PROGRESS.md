@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-08-02 · M0 收尾完成（feat/m0-kernel-skeleton）
+
+- **CLI 错误处理**：provider 抛 `APIError` 不再 traceback 崩溃。分工：`loop.run()` 负责状态回滚（撤销已 append 的 user 消息、`iter_count` 归位，再 `raise` 上抛）；CLI 只负责展示错误并回到输入循环——前端不碰 ctx 内部（铁律 5）。
+- **决策**：M0 只捕获 `APIError`，不扩大异常家族（更完整的 `on_error` 钩子机制留给 M1）；首次 run 失败时 system prompt 保留（会话固定前导，非污染）；`max_iter` 安全阀留到 M1——M0 无工具循环、一次输入恰为一次迭代，无事可守，提前实现违背"学习优先于性能"。
+- **最小测试**：引入 pytest（`pytest.ini` + `requirements.txt` 加依赖）；`tests/test_loop.py` 用不联网的 `FakeProvider` 覆盖 5 场景：system 只注入一次、二次不重注入、user→assistant 追加、system_prompt 覆盖、APIError 回滚与恢复。`python -m pytest` 5 用例全绿。
+- **新增文档**：`tests/CHEATSHEET.md`（pytest 最小用法，含"无断言的测试是假绿"提醒）。
+- 本次一并提交此前未落的 provider `APIError` 改动（`base.py`/`openai_compat.py`）与 `AI_ONBOARDING.md` 更新。
+
+**下一步**：M0 收尾提交即完成。之后进入 M1（钩子系统）：把 `kernel/loop.py` 的 `_emit` 空广播接入 HookManager，范围与验收见 `docs/ROADMAP.md`。
+
+---
+
 ## 2026-07-30 · 立项与设计阶段完成
 
 - 敲定项目定位、协作契约、架构铁律（见 CLAUDE.md）。

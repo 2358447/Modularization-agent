@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-08-03 · M1 工具系统进行中（message/tools/provider/翻译完成，loop 骨架就位）
+
+- **里程碑定序（澄清 2026-08-02 的误称）**：M1 = 工具系统（ROADMAP 原文），钩子系统是 M2。此前 PROGRESS 写"M1 钩子系统"是编号误称，owner 已拍板按 ROADMAP 走。分支 `feat/m1-tools` 从最新 main 切出（M0 早已通过 GitHub PR #1/#2/#3 合并进 main）。
+- **message.py**：content 重构为内容块列表（TextBlock/ToolCallBlock/ToolResultBlock），落地 MESSAGE_PROTOCOL §2 关键决策。to_dict/from_dict 往返无损，未知块类型抛 ValueError。两个方向用不同钥匙：对象→dict 用 isinstance、dict→对象按 type 字段。
+- **tools.py**：Tool（name/description/parameters JSON Schema/func）+ ToolRegistry（register 重名抛错/get/list_specs/call）。call 永远返回 ToolResultBlock，四条失败路径（未知工具/缺参/类型错/执行崩溃）全变 is_error 喂回模型，绝不掀翻主循环。校验用返回值传信号（预期内失败），执行异常用 try/except（非预期崩溃）。
+- **providers/base.py**：chat() 增加 tools 参数；Response.content 允许 None（纯工具调用）、新增 tool_calls（复用 ToolCallBlock）。
+- **openai_compat.py**：双向翻译。请求：内部 Message→OpenAI wire（text 拼接、tool_calls 展开、is_error 加 [错误] 前缀、tools 数组渲染）；响应：_parse_choice 解析 content（可 None）+ tool_calls（arguments JSON 字符串→dict，解析失败抛 APIError），call_id 透传厂商值（决策 #10）。chat() 彻底脱离"to_dict 当 wire"。
+- **loop.py**：ReAct 循环骨架就位（while + 工具分支 + max_iter 安全阀 MaxIterationsError + 快照式回滚），_assistant_message 与回滚两处 TODO 待填。
+- 测试：M0 5 用例保持绿（FakeProvider 绕过 wire 翻译）；M1 工具/翻译路径的正式测试留到 M1 收尾（任务 #8）。
+
+**下一步**：填 loop.py 两处 TODO → 示例工具（计算器/读文件）+ demo → 更新/新增测试 → M1 验收 → 合并回 main。
+
+---
+
 ## 2026-08-02 · M0 收尾完成（feat/m0-kernel-skeleton）
 
 - **CLI 错误处理**：provider 抛 `APIError` 不再 traceback 崩溃。分工：`loop.run()` 负责状态回滚（撤销已 append 的 user 消息、`iter_count` 归位，再 `raise` 上抛）；CLI 只负责展示错误并回到输入循环——前端不碰 ctx 内部（铁律 5）。

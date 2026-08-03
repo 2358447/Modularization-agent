@@ -40,19 +40,16 @@ class ToolRegistry:
 
     def register(self, tool: Tool) -> None:
         """注册一个工具。名字重复时抛 ValueError（让错误大声暴露）。"""
-        # TODO: 若 tool.name 已在 _tools 里，抛 ValueError；否则存进 _tools
         if tool.name in self._tools:
             raise ValueError(f"工具已存在: {tool.name}")
         self._tools[tool.name] = tool
 
     def get(self, name: str) -> Tool | None:
         """按名字查工具，查不到返回 None。"""
-        # TODO
         return self._tools.get(name)
 
     def list_specs(self) -> list[Tool]:
         """返回全部已注册工具，供 provider 渲染厂商 schema。"""
-        # TODO
         return list(self._tools.values())
 
     def call(self, call_id: str, name: str, arguments: dict) -> ToolResultBlock:

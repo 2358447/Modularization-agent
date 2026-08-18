@@ -125,14 +125,12 @@ class OpenAICompat(Provider):
             messages_list.append(wire)
         return messages_list
 
-
     @staticmethod
     def _to_openai_tools(tools: list[Tool]) -> list[dict]:
         """渲染 tools 数组：[{"type": "function", "function": {"name": ..., "description": ..., "parameters": ...}}]。
 
         直接复用 Tool 的 name/description/parameters 三个字段（CHEATSHEET §8）。
         """
-        # TODO
         tools_list = []
         for tool in tools:
             tools_list.append({
@@ -151,15 +149,11 @@ class OpenAICompat(Provider):
     def _parse_choice(choice: dict, data: dict) -> Response:
         """OpenAI 响应 → 内部 Response（CHEATSHEET §8 响应方向）。
 
-        TODO:
-        - content = choice["message"].get("content")，纯工具调用时是 None，别炸。
-        - tool_calls = choice["message"].get("tool_calls")，可能缺省（无工具调用）。
-          每个：call_id=item["id"]（透传厂商值，决策 #10）、
-          name=item["function"]["name"]、arguments=json.loads(JSON 字符串)。
-          ——JSON 解析失败怎么处理？建议抛 APIError（畸形响应，让错误大声说话）。
-        - 组装 Response(content, tool_calls or None, usage, model, finish_reason)。
+        content 纯工具调用时可为 None（别炸）；tool_calls 可能缺省。
+        每个 tool_call：call_id=item["id"]（透传厂商值，决策 #10）、
+        name=item["function"]["name"]、arguments=json.loads(JSON 字符串)。
+        ——JSON 解析失败抛 APIError：畸形响应让错误大声说话，不悄悄传残缺参数。
         """
-        # TODO
         content = choice["message"].get("content")
         tool_calls = []
         for item in choice["message"].get("tool_calls", []):

@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-08-18 · M1 工具循环补全（loop 两处 TODO 完成，翻译层清理）
+
+- **openai_compat.py 清理**：删除 `_to_openai_tools`/`_parse_choice` 残留的 TODO 注释（实现早已完成），docstring 从 TODO 清单改写为行为描述；修类内方法间双空行、补文件末尾换行。
+- **loop.py `_assistant_message` 完成**：把 Response 转成内部 assistant 消息——content 非空 → TextBlock，tool_calls（已是 ToolCallBlock 对象）直接并入 content 块列表。一条消息同时装文字与多个工具请求。
+- **loop.py 快照回滚完成**：`history_len` 记在 system 注入后、user append 前（首次 run 时=1 只含 system，后续 run=既有历史长度）；`APIError` 时截断 history 到 history_len、iter_count 归位 start_iter，再 re-raise。等价于 M0 的 pop user 消息，但覆盖多轮循环中间出错的场景。
+- **测试**：逻辑相关用例恢复绿——`test_does_not_reinject_system_prompt`、`test_api_error_rolls_back_history` 通过；全量 2 passed 3 failed。剩余 3 个失败是 M0 用例断言 `content` 裸字符串、与 M1 块列表结构不匹配，属测试适配任务（M1 收尾）。
+- **记录更正**：2026-08-03 记录的"M0 5 用例保持绿"与实际不符——M1 重构（content 块列表 + loop 骨架）后旧测试未适配已挂，本次补记。
+
+**下一步**：示例工具（计算器/读文件）+ demo 跑通端到端 → 适配 M0 测试 + 新增 M1 工具/翻译路径测试 → M1 验收合并回 main。
+
+---
+
 ## 2026-08-03 · M1 工具系统进行中（message/tools/provider/翻译完成，loop 骨架就位）
 
 - **里程碑定序（澄清 2026-08-02 的误称）**：M1 = 工具系统（ROADMAP 原文），钩子系统是 M2。此前 PROGRESS 写"M1 钩子系统"是编号误称，owner 已拍板按 ROADMAP 走。分支 `feat/m1-tools` 从最新 main 切出（M0 早已通过 GitHub PR #1/#2/#3 合并进 main）。

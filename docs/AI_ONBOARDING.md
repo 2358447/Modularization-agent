@@ -1,6 +1,6 @@
 # AI_ONBOARDING — 接手引导
 
-> **状态**：活文档 · 最后更新 2026-08-03
+> **状态**：活文档 · 最后更新 2026-08-18
 > §1 是可直接复制给接手 AI 的启动提示词；§2 是状态速览（每次里程碑收尾时更新）。
 
 ---
@@ -38,8 +38,8 @@
 
 ## 2. 当前状态速览
 
-- **阶段**：M1 工具系统进行中（分支 `feat/m1-tools`）。已完成 message 内容块重构、tools.py 注册表、provider 工具接口、openai_compat 双向翻译；loop.py ReAct 循环骨架就位（`_assistant_message` 与快照回滚两处 TODO 待填）。
-- **下一步**：填 loop.py 两处 TODO → 示例工具（计算器/读文件）+ demo → 更新测试（旧用例适配新 Message 结构 + 新增工具路径）→ M1 验收合并。
+- **阶段**：M1 工具系统进行中（分支 `feat/m1-tools`）。已完成 message 内容块重构、tools.py 注册表、provider 工具接口、openai_compat 双向翻译（残留 TODO 已清理）；loop.py ReAct 循环补全（`_assistant_message` 与快照回滚两处 TODO 已填）。
+- **下一步**：示例工具（计算器/读文件）+ demo 跑通端到端 → 更新测试（旧用例适配新 Message 结构 + 新增工具/翻译路径）→ M1 验收合并。
 - **首个 provider**：OpenAI 兼容（决策 #9）。**内核**：同步实现（决策 #1）。**测试**：pytest（`python -m pytest`）。
 - **设计文档的定位**：HOOKS §7 与 MODULES §3.2 等"后续机制"是**设计设想**，M2/实现阶段验证敲定，非必须照抄——保留了实现时的创作自由。
 - **权威进度**：始终以 `docs/PROGRESS.md` 最新一条为准（本节可能滞后）。

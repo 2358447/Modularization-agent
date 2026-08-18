@@ -36,10 +36,16 @@ def _emit(hook_name: str, ctx: Context) -> None:
 def _assistant_message(response: Response) -> Message:
     """把模型的 Response 转成内部 assistant 消息（text 块 + tool_call 块）。
 
-    TODO: content 非空 → 加 TextBlock；response.tool_calls（已是 ToolCallBlock
+    content 非空 → 加 TextBlock；response.tool_calls（已是 ToolCallBlock
     对象）直接并入 content 块列表。一条消息同时装文字和多个工具请求。
     """
-    # TODO
+    if response.content is not None:
+        content_blocks = [TextBlock(text=response.content)]
+    else:
+        content_blocks = []
+    if response.tool_calls is not None:
+        content_blocks.extend(response.tool_calls)
+    return Message(role="assistant", content=content_blocks)
 
 
 def run(
@@ -71,10 +77,10 @@ def run(
     # 首次运行时注入 system prompt；若历史已存在则不覆盖。
     if not ctx.history:
         ctx.history.insert(0, Message.text("system", system_prompt))
+    history_len = len(ctx.history)
     ctx.history.append(Message.text("user", user_input))
 
     # 快照：出错时回滚到 run 开始时的状态（撤销本轮追加的全部消息）
-    history_len = len(ctx.history)
     start_iter = ctx.iter_count
 
     _emit(Hook.ON_RUN_START, ctx)
@@ -92,9 +98,11 @@ def run(
                 tools=tools.list_specs() if tools else None,
             )
         except APIError:
-            # TODO: 快照回滚——截断 history 到 history_len、iter_count 归位
-            # 到 start_iter，然后 re-raise（和 M0 的 pop 用户消息等价，但覆盖
-            # 多轮循环中间出错的情况）。
+            # 快照回滚：截断 history 到 history_len、iter_count 归位到
+            # start_iter，然后 re-raise。覆盖多轮循环中间出错的情况。
+            ctx.history = ctx.history[:history_len]
+            ctx.iter_count = start_iter
+
             raise
         _emit(Hook.AFTER_MODEL_CALL, ctx)
 

@@ -4,6 +4,25 @@
 
 ---
 
+## 2026-08-18 · M2 钩子系统规划（枢纽里程碑，第一步 TODO 已标）
+
+- **M1 已完成并合并回 main**（见下一条）。M2 = 钩子系统内核（ROADMAP 原文），是后续所有模块的挂载点、整个架构的枢纽。设计总纲 `docs/HOOKS.md`；当前 `kernel/hooks.py` 只有 `Hook` 事件名枚举，`kernel/loop.py` 的 `_emit` 是空广播。
+- **M2 范围**（ROADMAP §2）：10 个钩子点广播 + 观察者/拦截者 + 优先级排序 + 拦截者"返回修改指令、内核施加+校验"（HOOKS §A）+ 中断三意图 SKIP/HALT/REPLACE（§D）+ 错误裁决 HALT>RETRY>FEED_MODEL（§B）+ 四道防线 + 内核内建 trace 事件流。
+- **建议分步**：
+  1. **第一步（TODO 已标）**：实现 `kernel/hooks.py` 的 `HookManager`（register/unregister/emit + 按优先级排序），把 `loop.py` 的 `_emit` 空广播接入。**开工前先定挂载方式**：hook_manager 作为 `run()` 参数（与 provider/tools 平级，默认 None=空操作）vs 挂 Context——权衡可测试性 vs 模块访问便利。
+  2. 观察者机制：只读、排序、崩溃隔离（防线 1/2）。
+  3. 拦截者机制：返回修改指令、内核校验后施加（HOOKS §A 逐个施加）。
+  4. 中断意图 SKIP/HALT/REPLACE + 短路规则（§D，HALT 多工具补全占位）。
+  5. 错误处理：on_error/on_tool_error + 内核裁决（§B）。
+  6. trace 事件流 + 四道防线完善（§5/§6）。
+  7. 验收：一个空观察者 + 一个简单拦截者，验证挂载/优先级/崩溃降级/trace 输出（ROADMAP 验收补充）。
+- **注意**：HOOKS §7 的机制（逐个施加、短路、HALT 补全）是**设计设想，实现时验证敲定**并回填该节；改动架构走三件套（改活文档 + 追加 DECISIONS + commit）。
+- **开分支前**：按决策 #4 先产出 `kernel/CHEATSHEET.md` 的 M2 补充（观察者/拦截者模式、优先级、修改指令模式）。
+
+**下一步**：开 `feat/m2-hooks` 分支，先定 HookManager 挂载方式，实现第一步（HookManager + 接入 `_emit`）。
+
+---
+
 ## 2026-08-18 · M1 收尾完成（示例工具 + demo + 测试全绿，合并回 main）
 
 - **示例工具 + demo**：`examples/tools.py` 新增 calculator（ast 白名单安全求值，禁 eval）与 read_file（三层防护：只读项目根内、拒隐藏文件、须存在）；`examples/m1_tools_demo.py` 端到端 demo，真实 provider 跑通（"计算 (2+3)*4" → 模型调 calculator → 结果回灌 → 回答 20），M1 ReAct 闭环验证成立。

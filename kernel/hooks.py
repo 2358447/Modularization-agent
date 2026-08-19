@@ -1,7 +1,10 @@
-"""钩子事件名常量。
+"""钩子系统：Hook 事件名常量 + HookManager（M2 第一步实现）。
 
-M0 只定义事件名，loop.py 在关键位置调用空广播函数占位。
-M1 实现 HookManager 后，把空广播替换为真正的 emit。
+M0/M1 只定义事件名（Hook），loop.py 的 _emit 为空广播占位。
+M2 第一步在本文件实现 HookManager：register / unregister / emit，
+并按优先级排序调用监听器，替换 loop.py 的空广播。
+
+设计总纲见 docs/HOOKS.md；M2 分步规划见 PROGRESS 最新一条。
 """
 
 from __future__ import annotations

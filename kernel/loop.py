@@ -28,8 +28,14 @@ class MaxIterationsError(Exception):
 
 
 def _emit(hook_name: str, ctx: Context) -> None:
-    """M0 空广播占位。M1 保留，M2 接入 HookManager。"""
-    # TODO: M2 接入 HookManager，遍历并调用对应 hook_name 的监听器。
+    """钩子广播。M0/M1 为空占位；M2 接入 HookManager。
+
+    全部调用点都走这里，M2 只需替换本函数体，主循环不用改。
+    """
+    # TODO(M2 第一步): 实现 kernel/hooks.py 的 HookManager（register/unregister/emit
+    # + 按优先级排序），把本函数从空广播改为 hook_manager.emit(hook_name, ctx)。
+    # 挂载方式先定：作为 run() 参数（与 provider/tools 平级）还是挂 Context，
+    # 权衡见 PROGRESS 最新一条 M2 规划。
     pass
 
 

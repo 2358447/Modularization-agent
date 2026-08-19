@@ -38,8 +38,8 @@
 
 ## 2. 当前状态速览
 
-- **阶段**：M1 工具系统进行中（分支 `feat/m1-tools`）。已完成 message 内容块重构、tools.py 注册表、provider 工具接口、openai_compat 双向翻译（残留 TODO 已清理）；loop.py ReAct 循环补全（`_assistant_message` 与快照回滚两处 TODO 已填）。
-- **下一步**：示例工具（计算器/读文件）+ demo 跑通端到端 → 更新测试（旧用例适配新 Message 结构 + 新增工具/翻译路径）→ M1 验收合并。
+- **阶段**：M1 工具系统已完成（合并回 main）。已交付：message 内容块、tools 注册表、provider 工具翻译、loop ReAct 循环、示例工具 calculator/read_file + 端到端 demo、全量 25 测试通过。
+- **下一步**：M2 钩子系统（分支 `feat/m2-hooks`）——把 `loop.py` 的 `_emit` 空广播接入 HookManager，为后续所有模块提供挂载点。范围与验收见 `docs/ROADMAP.md`。
 - **首个 provider**：OpenAI 兼容（决策 #9）。**内核**：同步实现（决策 #1）。**测试**：pytest（`python -m pytest`）。
 - **设计文档的定位**：HOOKS §7 与 MODULES §3.2 等"后续机制"是**设计设想**，M2/实现阶段验证敲定，非必须照抄——保留了实现时的创作自由。
 - **权威进度**：始终以 `docs/PROGRESS.md` 最新一条为准（本节可能滞后）。

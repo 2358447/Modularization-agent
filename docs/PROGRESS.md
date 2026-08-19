@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-08-18 · M1 收尾完成（示例工具 + demo + 测试全绿，合并回 main）
+
+- **示例工具 + demo**：`examples/tools.py` 新增 calculator（ast 白名单安全求值，禁 eval）与 read_file（三层防护：只读项目根内、拒隐藏文件、须存在）；`examples/m1_tools_demo.py` 端到端 demo，真实 provider 跑通（"计算 (2+3)*4" → 模型调 calculator → 结果回灌 → 回答 20），M1 ReAct 闭环验证成立。
+- **测试补齐**：全量 25 passed。M0 5 用例适配块列表结构；新增 tools 8 例（注册/查重/call 五路径）、openai_compat 9 例（双向翻译）、loop 工具循环 3 例（闭环/错误回灌/max_iter 安全阀）。
+- **微优化**：`_assistant_message` 用 truthy 判断 content，纯工具调用不再产生空 TextBlock。
+- **收尾**：合并 `feat/m1-tools` 回 main（分支上 5 个 commit），ROADMAP M1 标记完成。
+
+**下一步**：M2 钩子系统（分支 `feat/m2-hooks`）——把 `kernel/loop.py` 的 `_emit` 空广播接入 HookManager，范围与验收见 `docs/ROADMAP.md`。
+
+---
+
 ## 2026-08-18 · M1 工具循环补全（loop 两处 TODO 完成，翻译层清理）
 
 - **openai_compat.py 清理**：删除 `_to_openai_tools`/`_parse_choice` 残留的 TODO 注释（实现早已完成），docstring 从 TODO 清单改写为行为描述；修类内方法间双空行、补文件末尾换行。

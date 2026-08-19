@@ -82,7 +82,7 @@
 | 里程碑 | 分支 | 状态 |
 |--------|------|------|
 | M0 最小内核 | feat/m0-kernel-skeleton | 已完成 |
-| M1 工具系统 | feat/m1-tools | 进行中 |
+| M1 工具系统 | feat/m1-tools | 已完成 |
 | M2 钩子系统 | feat/m2-hooks | 未开始 |
 | M3 模块系统+可观测 | feat/m3-module-system | 未开始 |
 | M4+ 能力模块 | （各自分支） | 未开始 |

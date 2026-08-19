@@ -39,7 +39,7 @@ def _assistant_message(response: Response) -> Message:
     content 非空 → 加 TextBlock；response.tool_calls（已是 ToolCallBlock
     对象）直接并入 content 块列表。一条消息同时装文字和多个工具请求。
     """
-    if response.content is not None:
+    if response.content:
         content_blocks = [TextBlock(text=response.content)]
     else:
         content_blocks = []

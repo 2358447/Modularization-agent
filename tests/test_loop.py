@@ -36,7 +36,7 @@ def test_first_run_injects_system_prompt():
 
     assert result == "hi"
     assert [m.role for m in ctx.history] == ["system", "user", "assistant"]
-    assert ctx.history[0].content == "You are a helpful assistant."
+    assert ctx.history[0].content[0].text == "You are a helpful assistant."
 
 
 def test_does_not_reinject_system_prompt():
@@ -60,9 +60,9 @@ def test_appends_user_and_assistant_after_reply():
     run("hello", ctx, FakeProvider(reply="hi"))
 
     assert ctx.history[-2].role == "user"
-    assert ctx.history[-2].content == "hello"
+    assert ctx.history[-2].content[0].text == "hello"
     assert ctx.history[-1].role == "assistant"
-    assert ctx.history[-1].content == "hi"
+    assert ctx.history[-1].content[0].text == "hi"
 
 
 def test_system_prompt_override():
@@ -71,7 +71,7 @@ def test_system_prompt_override():
     run("hi", ctx, FakeProvider(), system_prompt="你是助手")
 
     assert ctx.history[0].role == "system"
-    assert ctx.history[0].content == "你是助手"
+    assert ctx.history[0].content[0].text == "你是助手"
 
 
 def test_api_error_rolls_back_history():

@@ -140,3 +140,11 @@ for interceptor in sorted_interceptors:
 **HALT 落在多工具批次中途（设想）**：OpenAI/Anthropic 都要求每个 tool_call 必须有配对 tool_result 才能发下一条消息。故 HALT 时内核为该轮所有**未执行的 tool_call** 各补一条 `tool_result(is_error=True, content="aborted: run halted")` 占位，保证配对完整、历史合法可续跑，再终止 run。
 
 **待实现阶段敲定**：`HookResult`/`ErrorAction` 的确切类型；优先级升/降序与默认值；trace event 字段（与 MESSAGE_PROTOCOL 一起定）；死循环检测挂 `on_iteration_start` 用什么信号判定（最大迭代数已是内核安全阀）。
+
+### M2 第一步已验证敲定（2026-08-20）
+
+- **挂载方式（决策 #12）**：HookManager 作为 `run()` 的 `hooks` 参数（默认 None=空操作），不挂 Context；`_emit` 为 `run()` 内部闭包捕获 hooks+ctx，调用点只传钩子名。
+- **注册表结构**：`hook_name → [(priority, callback), ...]`，`setdefault` 按需建键。
+- **优先级**：数字升序（小的先），同优先级按注册顺序（`sorted` 稳定）。默认 500。
+- **重复注册**：允许（emit 时多次调用），unregister 按回调对象身份删除**全部**匹配。hook_name 不校验。
+- **崩溃隔离**：本步**故意未做**（防线 1 在下一步观察者机制引入），当前一个回调崩溃会连坐整个 emit。

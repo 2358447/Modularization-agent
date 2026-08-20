@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 
 from kernel.context import Context
-from kernel.hooks import Hook
+from kernel.hooks import Hook, HookManager
 from kernel.message import Message, TextBlock
 from kernel.providers.base import APIError, Provider, Response
 from kernel.tools import ToolRegistry
@@ -25,18 +25,6 @@ DEFAULT_SYSTEM_PROMPT = os.environ.get(
 
 class MaxIterationsError(Exception):
     """单次 run 超过最大迭代次数（安全阀触发，强制停止）。"""
-
-
-def _emit(hook_name: str, ctx: Context) -> None:
-    """钩子广播。M0/M1 为空占位；M2 接入 HookManager。
-
-    全部调用点都走这里，M2 只需替换本函数体，主循环不用改。
-    """
-    # TODO(M2 第一步): 实现 kernel/hooks.py 的 HookManager（register/unregister/emit
-    # + 按优先级排序），把本函数从空广播改为 hook_manager.emit(hook_name, ctx)。
-    # 挂载方式先定：作为 run() 参数（与 provider/tools 平级）还是挂 Context，
-    # 权衡见 PROGRESS 最新一条 M2 规划。
-    pass
 
 
 def _assistant_message(response: Response) -> Message:
@@ -60,6 +48,7 @@ def run(
     provider: Provider,
     tools: ToolRegistry | None = None,
     system_prompt: str | None = None,
+    hooks: HookManager | None = None,
 ) -> str:
     """运行一次用户输入 → 模型回复的循环（可调用工具多轮迭代）。
 
@@ -69,6 +58,8 @@ def run(
         provider: provider 实例。
         tools: 可选工具注册表；传了则把工具规格交给模型，模型可要求调用。
         system_prompt: 可选，覆盖默认 system prompt。
+        hooks: 可选 HookManager；传了则每个关键时机广播钩子事件。
+            None（默认）时全部为空操作，行为与 M0/M1 完全一致。
 
     Returns:
         模型最终文本回复。
@@ -80,6 +71,14 @@ def run(
     if system_prompt is None:
         system_prompt = DEFAULT_SYSTEM_PROMPT
 
+    # M2 第一步：钩子广播入口。闭包捕获 hooks（可为 None）与 ctx，调用点只传钩子名。
+    # 挂载方式已定：hooks 作为 run() 参数（与 provider/tools 平级），不挂 Context。
+    def _emit(hook_name: str) -> None:
+        """广播钩子事件；hooks 为 None 时是空操作（M0/M1 行为）。"""
+        # TODO(M2 第一步): if hooks is not None: hooks.emit(hook_name, ctx)
+        if hooks is not None:
+            hooks.emit(hook_name, ctx)
+
     # 首次运行时注入 system prompt；若历史已存在则不覆盖。
     if not ctx.history:
         ctx.history.insert(0, Message.text("system", system_prompt))
@@ -89,15 +88,15 @@ def run(
     # 快照：出错时回滚到 run 开始时的状态（撤销本轮追加的全部消息）
     start_iter = ctx.iter_count
 
-    _emit(Hook.ON_RUN_START, ctx)
+    _emit(Hook.ON_RUN_START)
 
     while True:
         if ctx.iter_count >= ctx.max_iter:
             raise MaxIterationsError(f"超过最大迭代次数 {ctx.max_iter}")
         ctx.iter_count += 1
 
-        _emit(Hook.ON_ITERATION_START, ctx)
-        _emit(Hook.BEFORE_MODEL_CALL, ctx)
+        _emit(Hook.ON_ITERATION_START)
+        _emit(Hook.BEFORE_MODEL_CALL)
         try:
             response = provider.chat(
                 ctx.history,
@@ -110,27 +109,27 @@ def run(
             ctx.iter_count = start_iter
 
             raise
-        _emit(Hook.AFTER_MODEL_CALL, ctx)
+        _emit(Hook.AFTER_MODEL_CALL)
 
         ctx.history.append(_assistant_message(response))
 
         if not response.tool_calls:
             # 模型直接回答了，本轮结束
-            _emit(Hook.ON_ITERATION_END, ctx)
-            _emit(Hook.ON_RUN_END, ctx)
+            _emit(Hook.ON_ITERATION_END)
+            _emit(Hook.ON_RUN_END)
             return response.content or ""
 
         # 多工具串行执行（HOOKS §C）：每个工具独立走 before/after 钩子；
         # 结果先收齐，再一起塞回历史（一对一粒度，靠 call_id 配对）。
         results = []
         for call in response.tool_calls:
-            _emit(Hook.BEFORE_TOOL_CALL, ctx)
+            _emit(Hook.BEFORE_TOOL_CALL)
             result = tools.call(call.call_id, call.name, call.arguments)
-            _emit(Hook.AFTER_TOOL_CALL, ctx)
+            _emit(Hook.AFTER_TOOL_CALL)
             results.append(result)
 
         for result in results:
             ctx.history.append(Message(role="tool", content=[result]))
 
-        _emit(Hook.ON_ITERATION_END, ctx)
+        _emit(Hook.ON_ITERATION_END)
         # 循环继续：下一轮迭代

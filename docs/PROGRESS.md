@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-08-20 · M2 第一步完成（HookManager + 接入 _emit + 测试）
+
+- **决策落定**：挂载方式选 **run() 参数**（决策 #12）——hook manager 是内核基础设施而非 run 数据；`_emit` 由模块级函数改为 `run()` 内部闭包（捕获 hooks+ctx），8 个调用点从 `_emit(X, ctx)` 改为 `_emit(X)`。讨论要点：挂 Context 的"零改动"优势在 M2 中段（拦截/错误裁决要重构 loop↔hooks 交互）会过期。
+- **hooks.py**：`HookManager` 三个方法实现。register 用 `setdefault` 按需建键 + 追加；unregister 按回调对象身份（`is not`）过滤，删除全部重复匹配；emit 按 priority 升序调用，缺键空转，忽略返回值。docstring 从 TODO 清单改写为行为描述（M1 同款清理）。
+- **loop.py**：`run()` 加 `hooks: HookManager | None = None` 参数（None=空操作，M0/M1 行为不变）；`_emit` 变闭包，接入 `hooks.emit`。
+- **测试**：新增 `tests/test_hooks.py` 9 例——优先级排序、同优先级按注册序、注销、重复注册一次注销全删、空转、返回值忽略、loop 纯对话生命周期 6 事件、ctx 同一实例、工具路径 before/after_tool 每工具触发。全量 34 passed。
+- **owner 定的两个实现级决策**：允许重复注册（观察者阶段无妨，拦截机制引入后再审视）；hook_name 不校验（未知钩子名自动建键）。
+- **踩坑记录**：① "预填 10 个键 + `dir(Hook)` 内省"是过度设计，解决不存在的问题（键按需建即可，emit 用 get 兜底空转）；② register 的 append 误放进 `if not in` 分支，第二次注册同一钩子会静默丢回调——`setdefault` 一行同时解决。
+
+**下一步**：M2 第二步——观察者机制：只读、排序、崩溃隔离（防线 1/2）。届时 emit 给每个回调包 try/except，单个回调崩溃不连坐。
+
+---
+
 ## 2026-08-18 · M2 钩子系统规划（枢纽里程碑，第一步 TODO 已标）
 
 - **M1 已完成并合并回 main**（见下一条）。M2 = 钩子系统内核（ROADMAP 原文），是后续所有模块的挂载点、整个架构的枢纽。设计总纲 `docs/HOOKS.md`；当前 `kernel/hooks.py` 只有 `Hook` 事件名枚举，`kernel/loop.py` 的 `_emit` 是空广播。

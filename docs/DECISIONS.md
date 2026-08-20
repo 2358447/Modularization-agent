@@ -106,3 +106,14 @@
 
 **理由**：文档应帮助理解、不应替实现拍板未验证的设计。降格后接手者更清楚"哪些已定、哪些开放"，不会误把设想当真相去实现。
 **状态**：生效。
+
+---
+
+## #12 · HookManager 挂载方式：run() 参数，而非挂 Context
+
+**决策**：HookManager 作为 `run()` 的 `hooks` 参数注入（与 provider/tools 平级，默认 None = 空操作），不挂在 Context 上。`loop.py` 的 `_emit` 由模块级函数改为 `run()` 内部闭包，捕获 `hooks` 与 `ctx`，8 个调用点从 `_emit(X, ctx)` 改为 `_emit(X)`。
+
+**理由**：① 语义正确——hook manager 是内核循环的**基础设施（依赖）**，不是 run 的**数据**；Context 只装流经的数据（history/iter/scratch），装机制会让它承担两种角色。② 与 provider/tools 注入方式一致，同类东西同类做法。③ run 级隔离——每次 run 传什么就是什么，模块中途改动不跨 run 污染，测试天然隔离。④ 模块摸不到 manager，避免了"run 中途动态改钩子"这个当前无用例的权力。代价是改 8 个 `_emit` 调用点；且 M2 中段（拦截施加、错误裁决）loop↔hooks 交互本就要演进，该代价躲不掉。
+
+**备选否掉的方案**：挂 Context——零调用点改动、`_emit` 函数体原地替换即可，但 manager 变 session 级（CLI 里 ctx 跨 run 复用，改动会污染后续 run）、ctx 变臃肿、模块获得多余的钩子操作权。
+**状态**：生效。

@@ -1,6 +1,6 @@
 # kernel/ 技术盲区速查
 
-用途：owner 在实现 M0 kernel 时可能不熟的技术点。
+用途：owner 实现 kernel 各模块时可能不熟的技术点（M0/M1 已收录；M2 起按步骤在文件末尾追加，见 §11–14）。
 
 ---
 
@@ -89,13 +89,16 @@
 
 ---
 
-## 6. 空钩子广播 `_emit`
+## 6. 钩子广播 `_emit`（M2 第一步起为真实广播）
 
-- **用途**：M0 不实现 HookManager，但要让主循环的关键位置可见，M1 直接替换函数体。
+- **用途**：主循环在每个关键时机广播钩子事件。`run()` 内部闭包捕获 `hooks`（可为 `None`）与 `ctx`，调用点只传钩子名；`hooks=None` 时为空操作（M0/M1 行为不变）。
 - **最小例子**：
   ```python
-  def _emit(hook_name: str, ctx: Context) -> None:
-      pass  # M1 替换为 hook_manager.emit(hook_name, ctx)
+  def run(..., hooks: HookManager | None = None) -> str:
+      def _emit(hook_name: str) -> None:
+          if hooks is not None:
+              hooks.emit(hook_name, ctx)
+      _emit(Hook.ON_RUN_START)  # 调用点只传钩子名
   ```
 - **出现位置**：`kernel/loop.py`。
 
@@ -179,3 +182,42 @@
   ```
 - 校验失败 → 工具返回 `is_error=True`，错误信息喂回模型。
 - **出现位置**：示例工具计算器。
+
+## 11. 观察者（Observer）模式（M2 第二步）
+
+- **用途**：钩子回调默认是观察者——**只读** `ctx`、返回 `None`、顺序无关、崩了零影响（防线 2）。内核不依赖回调返回值。
+- **最小例子**：
+  ```python
+  hooks = HookManager()
+
+  def count_iters(ctx):
+      print("iteration", ctx.iter_count)  # 只读，不修改 ctx，返回 None
+
+  hooks.register(Hook.ON_ITERATION_START, count_iters, priority=100)
+  ```
+- **出现位置**：`kernel/hooks.py`、`tests/test_hooks.py`。
+
+## 12. 崩溃隔离（防线 1，M2 第二步）
+
+- **用途**：`emit` 给每个回调包 `try/except`，单个回调抛异常 → 记日志 + 跳过，**其余照常、不掀翻内核**。
+- **关键点**：
+  - `except Exception`（**不要 catch `BaseException`**）——`KeyboardInterrupt`/`SystemExit` 必须放行（Ctrl-C 优雅退出靠它）。
+  - 用 `logger.warning` 记可查信息（hook_name + 回调名 + exc），**绝不 raise**——否则一个崩了又连坐。
+  - 回调名用 `getattr(callback, "__name__", callback)`，避免打出每次运行都变的内存地址。
+- **出现位置**：`kernel/hooks.py` 的 `HookManager.emit`。
+- **注意**：钩子回调自身崩溃由防线 1 兜底，**不触发** `on_error`（否则钩子崩溃引发 on_error、on_error 又是钩子……钩子风暴）。见 HOOKS §5。
+
+## 13. 优先级排序（M2 第一步）
+
+- **用途**：同一钩子点多回调时，`register(priority=...)` 决定调用顺序——数字**升序**（小的先），同优先级按**注册顺序**（`sorted` 稳定），默认 500。
+- **最小例子**：
+  ```python
+  hooks.register(Hook.ON_RUN_START, a, priority=200)
+  hooks.register(Hook.ON_RUN_START, b, priority=100)  # b 先于 a 被调用
+  ```
+- **出现位置**：`kernel/hooks.py` 的 `register` / `emit`。
+
+## 14. 拦截者（Interceptor）模式（M2 步骤 3 引入）
+
+- **状态**：尚未实现。届时钩子回调可返回"修改指令"（modify/skip/halt/replace），由内核校验后施加；本小节在实现后回填。
+- **设计依据**：HOOKS §A/D（修改指令、三意图中断），实现时验证敲定。

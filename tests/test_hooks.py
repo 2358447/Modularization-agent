@@ -1,9 +1,10 @@
-"""kernel.hooks.HookManager 最小测试（M2 第一步）。
+"""kernel.hooks.HookManager 最小测试（M2 第一步/第二步）。
 
 覆盖：
 - 注册/注销（含重复注册的处理）
 - 优先级升序调用、同优先级按注册顺序
 - 没人监听的钩子空转、回调返回值被忽略
+- 崩溃隔离（M2 第二步，防线 1/2）：单回调崩溃不连坐、不掀翻内核
 - loop 接入 HookManager：纯对话 / 工具路径下，钩子按生命周期顺序广播
 """
 
@@ -197,3 +198,74 @@ def test_loop_hooks_fire_around_tool_call():
     # 工具路径跑了两轮迭代：第一轮 before/after_tool → iter_end，
     # 第二轮模型直接回答 → iter_end → run_end。
     assert fired == ["before_tool", "after_tool", "iter_end", "iter_end", "run_end"]
+
+
+def test_crashing_callback_does_not_break_emit():
+    """崩溃回调前后的回调都照常调用（不连坐，防线 1）。"""
+    hooks = HookManager()
+    calls: list[str] = []
+
+    def boom(ctx):
+        raise RuntimeError("observer crashed")
+
+    def mark(label):
+        def cb(ctx):
+            calls.append(label)
+
+        return cb
+
+    hooks.register(Hook.ON_RUN_START, mark("before"), priority=100)
+    hooks.register(Hook.ON_RUN_START, boom, priority=200)
+    hooks.register(Hook.ON_RUN_START, mark("after"), priority=300)
+
+    hooks.emit(Hook.ON_RUN_START, Context())  # 不抛
+
+    assert calls == ["before", "after"]
+
+
+def test_emit_does_not_raise_when_callback_crashes():
+    """回调抛异常时 emit 自身不抛（不掀翻内核）。"""
+    hooks = HookManager()
+    hooks.register(Hook.ON_RUN_START, lambda ctx: 1 / 0)
+
+    hooks.emit(Hook.ON_RUN_START, Context())  # 不抛即通过
+
+
+def test_multiple_crashing_callbacks_others_still_run():
+    """多个崩溃回调夹正常回调，正常回调全部照跑。"""
+    hooks = HookManager()
+    calls: list[str] = []
+
+    def boom(ctx):
+        raise ValueError("boom")
+
+    def mark(label):
+        def cb(ctx):
+            calls.append(label)
+
+        return cb
+
+    hooks.register(Hook.ON_RUN_START, boom, priority=100)
+    hooks.register(Hook.ON_RUN_START, mark("a"), priority=200)
+    hooks.register(Hook.ON_RUN_START, boom, priority=300)
+    hooks.register(Hook.ON_RUN_START, mark("b"), priority=400)
+    hooks.register(Hook.ON_RUN_START, boom, priority=500)
+
+    hooks.emit(Hook.ON_RUN_START, Context())
+
+    assert calls == ["a", "b"]
+
+
+def test_crashing_observer_in_loop_does_not_break_run():
+    """loop 里挂一个会崩的观察者，run() 仍正常返回（防线 1 兜底）。"""
+    hooks = HookManager()
+
+    def boom(ctx):
+        raise RuntimeError("observer died")
+
+    hooks.register(Hook.BEFORE_MODEL_CALL, boom)
+
+    ctx = Context()
+    result = run("hello", ctx, FakeProvider(), hooks=hooks)
+
+    assert result == "ok"

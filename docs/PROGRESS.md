@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-08-24 · M2 第二步完成（崩溃隔离·防线 1/2 + 测试 + CHEATSHEET 补充）
+
+- **防线 1 落地**：`HookManager.emit` 给每个回调包 `try/except`——单个回调抛异常 → `logger.warning` 记一条（hook_name + 回调名 `getattr(callback,"__name__")` + 异常）→ 跳过继续，其余照常、不掀翻内核。`except Exception` 而非 `BaseException`（Ctrl-C 的 `KeyboardInterrupt` 必须放行）。
+- **通道边界确认**：logger 走 stderr（给人看）、`ctx.history` 是模型唯一输入（给 AI 看），两条独立通道——回调崩溃细节不会进模型上下文。trace 事件流（给前端看）是 M2 步骤 6 的第三条通道。
+- **测试**：`tests/test_hooks.py` 新增 4 例崩溃隔离（崩溃前后回调照跑 / emit 不抛 / 多崩夹正常全跑 / loop 里崩的观察者不中断 run）。全量 38 passed。
+- **清理**：删 `loop.py` 遗留的过期 TODO(M2 第一步)；`hooks.py` 僵尸 TODO 随实现落地删除（TODO 生命周期 = 到实现落地为止）。
+- **CHEATSHEET**：补 §11 观察者 / §12 崩溃隔离 / §13 优先级（决策 #4 欠账补上），§6「空钩子广播 `_emit`」同步为真实广播现状。
+
+**下一步**：M2 第三步——拦截者机制（返回修改指令、内核校验后施加，HOOKS §A），届时 emit 收集回调返回值（可能演进为 emit_and_collect）。
+
+---
+
 ## 2026-08-20 · M2 第一步完成（HookManager + 接入 _emit + 测试）
 
 - **决策落定**：挂载方式选 **run() 参数**（决策 #12）——hook manager 是内核基础设施而非 run 数据；`_emit` 由模块级函数改为 `run()` 内部闭包（捕获 hooks+ctx），8 个调用点从 `_emit(X, ctx)` 改为 `_emit(X)`。讨论要点：挂 Context 的"零改动"优势在 M2 中段（拦截/错误裁决要重构 loop↔hooks 交互）会过期。

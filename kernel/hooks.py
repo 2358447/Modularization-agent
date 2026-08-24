@@ -1,17 +1,22 @@
-"""钩子系统：Hook 事件名常量 + HookManager（M2 第一步实现）。
+"""钩子系统：Hook 事件名常量 + HookManager（M2 第一步/第二步实现）。
 
 M0/M1 只定义事件名（Hook），loop.py 的 _emit 为空广播占位。
 M2 第一步实现 HookManager：register / unregister / emit，按优先级
 排序调用监听器，并接入 loop.py 的 _emit（作为 run() 的 hooks 参数）。
+M2 第二步加入崩溃隔离（防线 1/2）：单个回调崩溃不连坐、不掀翻内核。
 
 设计总纲见 docs/HOOKS.md；M2 分步规划见 PROGRESS 最新一条。
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Callable
 
 from kernel.context import Context
+
+
+logger = logging.getLogger(__name__)
 
 
 class Hook:
@@ -89,10 +94,21 @@ class HookManager:
         拦截者的"返回修改指令、内核施加"机制在步骤 3 引入，届时收集返回值
         （可能演进为 emit_and_collect）。
 
+        M2 第二步（防线 1/2）：单个回调抛异常 → 记日志 + 跳过，其余照常、
+        不掀翻内核。观察者崩了零影响（防线 2）。
+
         Args:
             hook_name: Hook 常量之一。
             ctx: 当前运行上下文，传给每个回调。
         """
         if hook_name in self._registry:
             for _, callback in sorted(self._registry[hook_name], key=lambda x: x[0]):
-                callback(ctx)
+                try:
+                    callback(ctx)
+                except Exception as exc:
+                    logger.warning(
+                        "钩子回调崩溃，已跳过继续: hook=%s callback=%s exc=%s",
+                        hook_name,
+                        getattr(callback, "__name__", callback),
+                        exc,
+                    )

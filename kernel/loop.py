@@ -75,7 +75,6 @@ def run(
     # 挂载方式已定：hooks 作为 run() 参数（与 provider/tools 平级），不挂 Context。
     def _emit(hook_name: str) -> None:
         """广播钩子事件；hooks 为 None 时是空操作（M0/M1 行为）。"""
-        # TODO(M2 第一步): if hooks is not None: hooks.emit(hook_name, ctx)
         if hooks is not None:
             hooks.emit(hook_name, ctx)
 

@@ -4,6 +4,57 @@
 
 ---
 
+## 2026-09-01 · M2 第四步设计拍板 + 骨架落地（逻辑待填）
+
+- **五个设计决策**（讨论拍板，全文见 HOOKS §7"第四步设计结论"）：① Skip/Halt/Replace 与 Modify 共用 `Directive` 基类，`is_terminal()` 分界；② 分工——HookManager 书记员（施加 Modify、收集终止意图），loop 执行者（动流程）；③ HALT 用 `RunHalted` 异常传出、**不回滚历史**（可续跑是 HALT 的意义）；④ 批次中途 HALT 先补 `tool_result(is_error)` 占位再抛（`_halt_tool_batch`）；⑤ Replace payload 按钩子点在 emit 校验（表驱动，第三行时重构为类型自带知识）。
+- **骨架绘制时新发现**：Modify 在 before/after_tool_call 会插在 tool_call 与配对结果之间、破坏 wire 合法性 → `_MODIFY_FORBIDDEN_HOOKS` 禁入（防线 3 随用例生长的第一次扩展）；after_tool_call 的"改结果"Replace 推迟到真实用例出现。
+- **骨架内容**：Directive 家族（纯声明）+ 两张校验表 + `emit` 签名改 `Directive | None` + loop 的 `RunHalted` / `_emit(halt_raises=...)` / `_halt_tool_batch` 签名与 docstring。**六处 TODO 待 owner 填**：`_validate_directive`（四条分派）、emit 短路一行、`_emit` 的 Halt 一行、模型点 Replace 短路、工具点 Skip/Replace/Halt 三分派、`_halt_tool_batch`（本步核心，约 10 行）。
+- **预埋的坑（已记录防遗忘）**：first-wins 短路模型**不覆盖**第五步错误裁决（收集-裁决），on_error 届时另立约定（HOOKS §7 标注）。
+- **当前状态**：import 干净；39/45 passed——6 个失败全是依赖 TODO 的拦截者用例，填完即回绿（骨架提交进功能分支，符合"半成品不进 main"）。
+- **杂项**：第四步注释做过一轮精简（设计叙述移入文档，代码只留职责定性 + 防坑提示）；版本树思维导图（本地 HTML，含各里程碑能力与 M4+ 钩子挂载点）已生成给 owner，未入库。
+
+**下一步**：填六处 TODO → pytest 回绿 → 补测试（短路规则/HALT 占位/Replace 两点/Skip 拒绝结果/Modify 禁入）→ 收尾三件套 → M2 还剩第五步（错误裁决）、第六步（trace 事件流）、第七步（验收）。
+
+---
+
+## 2026-09-01 · M2 第三步完成（拦截者机制·防线 3 + 测试 45）
+
+- **修改指令落地**：`Modify`（frozen dataclass，唯一字段 `append_messages: tuple[Message, ...]`，tuple 防拦截者持有可篡改引用）+ 构造入口 `modify(list)`（自动转 tuple）。`is_terminal()` 恒 False——只给第四步中断指令留家族接口的缝，不预建类型（吸取第一步"预填 10 键"教训）。
+- **三个实现级决策**（讨论后拍板）：① 施加放 emit 循环逐个校验+施加——loop.py 零改动，后续回调天然可见前面的修改（注入先于压缩的顺序保证）；② 角色由返回值隐式区分（None=观察者 / Modify=拦截者 / 其他=脏指令视同非法）；③ 防线 3 最小校验——只验指令本身三条（Modify 实例 / tuple|list 非空 / 每项是 Message），不验全量历史（校验跟着真实用例长）。
+- **防线 3 落地**：`_validate_modify` 非法 → warning（hook + 回调 + 原因）→ 拒绝该拦截者本轮 → 继续广播，绝不 raise。防线 2 补完：拦截者崩溃 = 无指令产生 = 用原始数据继续，与观察者同款，零新代码。
+- **踩坑（review 抓出，测试测不出）**：拒绝日志用 `+` 拼接 `getattr(callback,"__name__",callback)`，其 fallback 是回调对象本身——无名回调（如 `functools.partial`）时 TypeError 冲出 emit、掀翻主循环，恰好击穿防线 1；普通函数测试全绿测不出来。修正为 `%s` 惰性格式化（与防线 1 同款）+ 补 partial 回归测试。教训：日志拼接一律走惰性格式化。
+- **测试**：38 → 45 passed。新增 7 例（is_terminal 契约 / 观察者回归 / 合法施加 / 顺序可见 / 非法指令四连 / 无名回调 / loop 注入进模型输入= RAG 最小原型）；改写 1 例（"返回值被忽略"的前提已被第三步语义取代，留旧断言即假绿）。
+- **收尾**：CHEATSHEET §14 回填（拦截者/修改指令模式）；HOOKS §7 回填"第三步已验证敲定"；ROADMAP 状态表 + AI_ONBOARDING §2 同步。
+
+**下一步**：M2 第四步——中断三意图 SKIP/HALT/REPLACE + 短路规则（HOOKS §D，HALT 落在多工具批次中途须补全 tool_result 占位），届时 emit 演进为返回终止意图供 loop 短路。
+
+---
+
+## 2026-08-24 · M2 第二步完成（崩溃隔离·防线 1/2 + 测试 + CHEATSHEET 补充）
+
+- **防线 1 落地**：`HookManager.emit` 给每个回调包 `try/except`——单个回调抛异常 → `logger.warning` 记一条（hook_name + 回调名 `getattr(callback,"__name__")` + 异常）→ 跳过继续，其余照常、不掀翻内核。`except Exception` 而非 `BaseException`（Ctrl-C 的 `KeyboardInterrupt` 必须放行）。
+- **通道边界确认**：logger 走 stderr（给人看）、`ctx.history` 是模型唯一输入（给 AI 看），两条独立通道——回调崩溃细节不会进模型上下文。trace 事件流（给前端看）是 M2 步骤 6 的第三条通道。
+- **测试**：`tests/test_hooks.py` 新增 4 例崩溃隔离（崩溃前后回调照跑 / emit 不抛 / 多崩夹正常全跑 / loop 里崩的观察者不中断 run）。全量 38 passed。
+- **清理**：删 `loop.py` 遗留的过期 TODO(M2 第一步)；`hooks.py` 僵尸 TODO 随实现落地删除（TODO 生命周期 = 到实现落地为止）。
+- **CHEATSHEET**：补 §11 观察者 / §12 崩溃隔离 / §13 优先级（决策 #4 欠账补上），§6「空钩子广播 `_emit`」同步为真实广播现状。
+
+**下一步**：M2 第三步——拦截者机制（返回修改指令、内核校验后施加，HOOKS §A），届时 emit 收集回调返回值（可能演进为 emit_and_collect）。
+
+---
+
+## 2026-08-20 · M2 第一步完成（HookManager + 接入 _emit + 测试）
+
+- **决策落定**：挂载方式选 **run() 参数**（决策 #12）——hook manager 是内核基础设施而非 run 数据；`_emit` 由模块级函数改为 `run()` 内部闭包（捕获 hooks+ctx），8 个调用点从 `_emit(X, ctx)` 改为 `_emit(X)`。讨论要点：挂 Context 的"零改动"优势在 M2 中段（拦截/错误裁决要重构 loop↔hooks 交互）会过期。
+- **hooks.py**：`HookManager` 三个方法实现。register 用 `setdefault` 按需建键 + 追加；unregister 按回调对象身份（`is not`）过滤，删除全部重复匹配；emit 按 priority 升序调用，缺键空转，忽略返回值。docstring 从 TODO 清单改写为行为描述（M1 同款清理）。
+- **loop.py**：`run()` 加 `hooks: HookManager | None = None` 参数（None=空操作，M0/M1 行为不变）；`_emit` 变闭包，接入 `hooks.emit`。
+- **测试**：新增 `tests/test_hooks.py` 9 例——优先级排序、同优先级按注册序、注销、重复注册一次注销全删、空转、返回值忽略、loop 纯对话生命周期 6 事件、ctx 同一实例、工具路径 before/after_tool 每工具触发。全量 34 passed。
+- **owner 定的两个实现级决策**：允许重复注册（观察者阶段无妨，拦截机制引入后再审视）；hook_name 不校验（未知钩子名自动建键）。
+- **踩坑记录**：① "预填 10 个键 + `dir(Hook)` 内省"是过度设计，解决不存在的问题（键按需建即可，emit 用 get 兜底空转）；② register 的 append 误放进 `if not in` 分支，第二次注册同一钩子会静默丢回调——`setdefault` 一行同时解决。
+
+**下一步**：M2 第二步——观察者机制：只读、排序、崩溃隔离（防线 1/2）。届时 emit 给每个回调包 try/except，单个回调崩溃不连坐。
+
+---
+
 ## 2026-08-18 · M2 钩子系统规划（枢纽里程碑，第一步 TODO 已标）
 
 - **M1 已完成并合并回 main**（见下一条）。M2 = 钩子系统内核（ROADMAP 原文），是后续所有模块的挂载点、整个架构的枢纽。设计总纲 `docs/HOOKS.md`；当前 `kernel/hooks.py` 只有 `Hook` 事件名枚举，`kernel/loop.py` 的 `_emit` 是空广播。

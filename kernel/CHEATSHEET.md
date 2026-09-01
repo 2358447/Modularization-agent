@@ -1,6 +1,6 @@
 # kernel/ 技术盲区速查
 
-用途：owner 在实现 M0 kernel 时可能不熟的技术点。
+用途：owner 实现 kernel 各模块时可能不熟的技术点（M0/M1 已收录；M2 起按步骤在文件末尾追加，见 §11–14）。
 
 ---
 
@@ -89,13 +89,16 @@
 
 ---
 
-## 6. 空钩子广播 `_emit`
+## 6. 钩子广播 `_emit`（M2 第一步起为真实广播）
 
-- **用途**：M0 不实现 HookManager，但要让主循环的关键位置可见，M1 直接替换函数体。
+- **用途**：主循环在每个关键时机广播钩子事件。`run()` 内部闭包捕获 `hooks`（可为 `None`）与 `ctx`，调用点只传钩子名；`hooks=None` 时为空操作（M0/M1 行为不变）。
 - **最小例子**：
   ```python
-  def _emit(hook_name: str, ctx: Context) -> None:
-      pass  # M1 替换为 hook_manager.emit(hook_name, ctx)
+  def run(..., hooks: HookManager | None = None) -> str:
+      def _emit(hook_name: str) -> None:
+          if hooks is not None:
+              hooks.emit(hook_name, ctx)
+      _emit(Hook.ON_RUN_START)  # 调用点只传钩子名
   ```
 - **出现位置**：`kernel/loop.py`。
 
@@ -179,3 +182,58 @@
   ```
 - 校验失败 → 工具返回 `is_error=True`，错误信息喂回模型。
 - **出现位置**：示例工具计算器。
+
+## 11. 观察者（Observer）模式（M2 第二步）
+
+- **用途**：钩子回调默认是观察者——**只读** `ctx`、返回 `None`、顺序无关、崩了零影响（防线 2）。内核不依赖回调返回值。
+- **最小例子**：
+  ```python
+  hooks = HookManager()
+
+  def count_iters(ctx):
+      print("iteration", ctx.iter_count)  # 只读，不修改 ctx，返回 None
+
+  hooks.register(Hook.ON_ITERATION_START, count_iters, priority=100)
+  ```
+- **出现位置**：`kernel/hooks.py`、`tests/test_hooks.py`。
+
+## 12. 崩溃隔离（防线 1，M2 第二步）
+
+- **用途**：`emit` 给每个回调包 `try/except`，单个回调抛异常 → 记日志 + 跳过，**其余照常、不掀翻内核**。
+- **关键点**：
+  - `except Exception`（**不要 catch `BaseException`**）——`KeyboardInterrupt`/`SystemExit` 必须放行（Ctrl-C 优雅退出靠它）。
+  - 用 `logger.warning` 记可查信息（hook_name + 回调名 + exc），**绝不 raise**——否则一个崩了又连坐。
+  - 回调名用 `getattr(callback, "__name__", callback)`，避免打出每次运行都变的内存地址。
+- **出现位置**：`kernel/hooks.py` 的 `HookManager.emit`。
+- **注意**：钩子回调自身崩溃由防线 1 兜底，**不触发** `on_error`（否则钩子崩溃引发 on_error、on_error 又是钩子……钩子风暴）。见 HOOKS §5。
+
+## 13. 优先级排序（M2 第一步）
+
+- **用途**：同一钩子点多回调时，`register(priority=...)` 决定调用顺序——数字**升序**（小的先），同优先级按**注册顺序**（`sorted` 稳定），默认 500。
+- **最小例子**：
+  ```python
+  hooks.register(Hook.ON_RUN_START, a, priority=200)
+  hooks.register(Hook.ON_RUN_START, b, priority=100)  # b 先于 a 被调用
+  ```
+- **出现位置**：`kernel/hooks.py` 的 `register` / `emit`。
+
+## 14. 拦截者 / 修改指令模式（M2 第三步）
+
+- **用途**：钩子回调可以**改数据**了——但禁止就地改（不许 `ctx.history = [...]` 直接篡改），必须**返回修改指令**（`Modify`），由内核校验（防线 3）后施加。好处：所有修改经内核之手，"谁、何时、改了什么"可追溯、可拒绝、顺序可控。
+- **最小例子**（RAG 注入原型）：
+  ```python
+  from kernel.hooks import Hook, modify
+
+  def rag_inject(ctx):
+      chunks = retrieve(ctx.history[-1])
+      return modify([Message.text("user", f"[资料] {chunks}")])
+
+  hooks.register(Hook.BEFORE_MODEL_CALL, rag_inject, priority=100)  # 注入段须在压缩段(200)之前
+  ```
+- **关键点**：
+  - **角色由返回值隐式区分**（决策）：返回 `None` = 观察者，返回 `Modify` = 拦截者，其他返回值 = 脏指令视同非法拒绝。
+  - `Modify` 是 frozen dataclass，字段 `append_messages: tuple[Message, ...]`（tuple 防拦截者持有可篡改历史的引用）；构造走 `modify([...])`，list 自动转 tuple。
+  - `is_terminal()` 恒 `False`——第四步的 Skip/Halt/Replace 中断指令共用这个接口，`Modify` 是指令家族的一员。
+  - **逐个施加**：emit 循环里校验一个施加一个，后面的回调天然看到前面的修改（注入先于压缩的顺序保证，HOOKS §7）。
+  - 校验拒绝 = **该拦截者本轮失效**：记 warning 后继续下一个回调，绝不 raise（拒绝路径自身不许炸出 emit，见 HOOKS §7 的 `%s` 教训）。
+- **出现位置**：`kernel/hooks.py`（`Modify` / `modify` / `_validate_modify` / `emit`）、`tests/test_hooks.py`。

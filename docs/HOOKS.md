@@ -1,6 +1,7 @@
 # HOOKS — 钩子系统设计
 
-> **状态**：设计设想 · 对齐决策 #1/#10 · 活文档 · 最后更新 2026-07-30
+> **状态**：设计设想 · 对齐决策 #1/#10 · 活文档 · 最后更新 2026-09-01
+> §7 逐步回填"实现已验证敲定"的机制；未敲定部分仍是设计设想。
 > 钩子系统的设计。内核实现与模块钩子回调以此为方向。
 > **注**：本文件的**机制细节（拦截链施加顺序、短路规则、HALT 补全等）是当前设想，M2 实现时验证敲定**——不是必须照抄的硬约束，实现中发现更好的做法可调整并回填本文件（走三件套）。动到钩子系统时读这份。
 
@@ -140,3 +141,37 @@ for interceptor in sorted_interceptors:
 **HALT 落在多工具批次中途（设想）**：OpenAI/Anthropic 都要求每个 tool_call 必须有配对 tool_result 才能发下一条消息。故 HALT 时内核为该轮所有**未执行的 tool_call** 各补一条 `tool_result(is_error=True, content="aborted: run halted")` 占位，保证配对完整、历史合法可续跑，再终止 run。
 
 **待实现阶段敲定**：`HookResult`/`ErrorAction` 的确切类型；优先级升/降序与默认值；trace event 字段（与 MESSAGE_PROTOCOL 一起定）；死循环检测挂 `on_iteration_start` 用什么信号判定（最大迭代数已是内核安全阀）。
+
+### M2 第一步已验证敲定（2026-08-20）
+
+- **挂载方式（决策 #12）**：HookManager 作为 `run()` 的 `hooks` 参数（默认 None=空操作），不挂 Context；`_emit` 为 `run()` 内部闭包捕获 hooks+ctx，调用点只传钩子名。
+- **注册表结构**：`hook_name → [(priority, callback), ...]`，`setdefault` 按需建键。
+- **优先级**：数字升序（小的先），同优先级按注册顺序（`sorted` 稳定）。默认 500。
+- **重复注册**：允许（emit 时多次调用），unregister 按回调对象身份删除**全部**匹配。hook_name 不校验。
+- **崩溃隔离**：本步**故意未做**（防线 1 在下一步观察者机制引入），当前一个回调崩溃会连坐整个 emit。
+
+### M2 第二步已验证敲定（2026-08-24）
+
+- **防线 1 落地（崩溃隔离）**：`emit` 给每个回调包 `try/except`。单个回调抛异常 → `logger.warning` 记一条（hook_name + 回调名 `getattr(callback, "__name__")` + 异常）→ 跳过继续，其余照常、不掀翻内核。`except Exception` 而非 `BaseException`（Ctrl-C 的 `KeyboardInterrupt` 必须放行）。
+- **通道边界**：钩子回调崩溃由防线 1 兜底，**不触发 `on_error`**（防钩子风暴，§5 原设计照旧）；日志走 logger（stderr），不进入模型上下文（`ctx.history` 是模型唯一输入，通道隔离是内核设计而非巧合）。
+- **防线 2（观察者）**：当前所有回调都是观察者（返回值被忽略），"崩了零影响"的降级语义即"跳过继续"；拦截者的按角色降级留待步骤 3。
+
+### M2 第三步已验证敲定（2026-09-01）
+
+- **修改指令 `Modify`**：frozen dataclass，唯一字段 `append_messages: tuple[Message, ...]`（tuple 防拦截者持有可篡改历史的引用）；构造入口 `modify(list)` 自动转 tuple。指令家族共用 `is_terminal()` 接口，Modify 恒 False——第四步 Skip/Halt/Replace 往家族里添加，不推翻。
+- **施加位置（决策）**：HookManager.emit 循环内**逐个校验 + 施加**——loop.py 零改动，M0/M1 观察者行为不变；后续回调天然可见前面的修改（注入先于压缩的顺序保证）。emit 当前返回 None，第四步引入终止意图时演进为返回意图供 loop 短路。
+- **角色隐式区分（决策）**：返回 None = 观察者，返回 Modify = 拦截者，其他返回值视同非法指令拒绝。不做注册时显式声明——返回值已携带意图，模块在不同钩子点角色不同也无需重复申报。
+- **防线 3 落地**：`_validate_modify` 最小校验三条（是 Modify 实例 / append_messages 是 tuple|list 且非空 / 每项是 Message），非法 → warning 记 hook + 回调 + 原因 → 拒绝该指令（拦截者本轮失效）→ 继续下一个回调，绝不 raise。不做全量历史校验（before_model_call 时点 tool_call 配对天然完整，破坏配对的场景出现时再扩展）。
+- **防线 2 补完（语义确认）**：拦截者崩溃 = 没有指令产生 = 用原始数据继续，与观察者的隔离行为天然一致，无需新代码。
+- **实测修正**：拒绝日志最初用字符串 `+` 拼接 `getattr(callback, "__name__", callback)`，其 fallback 是回调对象本身——无 `__name__` 的回调（如 `functools.partial`）会 TypeError 冲出 emit、掀翻主循环，恰好击穿防线 1；普通函数测试全绿测不出来。修正为 `%s` 惰性格式化（与防线 1 同款）并补无名回调回归测试。教训：日志拼接一律走惰性格式化，`+` 拼接 + getattr fallback 是隐性炸点。
+
+### M2 第四步设计结论（2026-09-01 拍板，骨架已就位、**待实现验证**——实现后回填"已验证敲定"）
+
+- **Directive 家族**：Modify/Skip/Halt/Replace 共用基类，`is_terminal()` 分界（False = emit 施加后广播继续；True = 短路广播、指令交还 loop）。第五步错误裁决走"收集-裁决"，不经此短路模型，届时 on_error 另立约定。
+- **分工**：HookManager 书记员（施加 Modify、返回第一个终止意图）；loop 执行者（SKIP 合成拒绝结果 / REPLACE 顶替产物 / HALT 终止）。
+- **短路规则（设想验证中）**：升序执行，第一个终止意图胜出并短路其余；校验非法 → 不短路、记警告、降级继续。
+- **HALT**：`RunHalted` 异常传出，**不回滚历史**；批次中途先补 `tool_result(is_error=True, content="aborted: run halted")` 占位（含触发 HALT 的当前调用）再抛。`_emit` 默认就地 raise，工具批次两点 `halt_raises=False` 延后到分派处。
+- **Replace payload 按钩子点校验**：表驱动（before_tool_call → ToolResultBlock、before_model_call → Response），表到第三行时重构为类型自带知识；after_tool_call 的"改结果"推迟到真实用例出现。
+- **Modify 禁入 before/after_tool_call**（骨架绘制时新发现）：批次中途 history 以 assistant(tool_calls) 结尾、结果未入历史，追加消息会插在 tool_call 与配对结果之间破坏 wire 合法性——防线 3 随用例生长的第一次扩展。
+- **SKIP 拒绝结果**：`is_error=True`、`content="skipped: {reason}"`。
+- **范围**：REPLACE 两点（工具/模型）都做；demo 留 M2 验收（步骤 7）。

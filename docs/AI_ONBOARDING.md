@@ -1,6 +1,6 @@
 # AI_ONBOARDING — 接手引导
 
-> **状态**：活文档 · 最后更新 2026-08-18
+> **状态**：活文档 · 最后更新 2026-08-24
 > §1 是可直接复制给接手 AI 的启动提示词；§2 是状态速览（每次里程碑收尾时更新）。
 
 ---
@@ -38,8 +38,8 @@
 
 ## 2. 当前状态速览
 
-- **阶段**：M1 工具系统已完成（合并回 main）。已交付：message 内容块、tools 注册表、provider 工具翻译、loop ReAct 循环、示例工具 calculator/read_file + 端到端 demo、全量 25 测试通过。
-- **下一步**：M2 钩子系统（分支 `feat/m2-hooks`）——设计总纲 `docs/HOOKS.md`，实现 `HookManager` 并把 `loop.py` 的 `_emit` 空广播接入。第一步 TODO 已标（`loop.py` `_emit` + `hooks.py`），分步规划见 PROGRESS 最新一条。
+- **阶段**：M2 钩子系统进行中（分支 `feat/m2-hooks`）。第一/二/三步已完成并全绿（45 tests）；**第四步（中断三意图 SKIP/HALT/REPLACE，HOOKS §D）骨架已落地、核心逻辑待填**——Directive 指令家族 + 两张校验表就位，四处 TODO：`_validate_directive`、emit 短路、模型点 Replace、工具点三分派 + `_halt_tool_batch` 占位补全。当前 39/45 passed，填完即回绿。设计结论见 HOOKS §7"第四步设计结论"（标注待实现验证）。
+- **下一步**：填第四步骨架 TODO → pytest 回绿 → 测试补充 + 收尾三件套；分步规划见 PROGRESS 最新一条。
 - **首个 provider**：OpenAI 兼容（决策 #9）。**内核**：同步实现（决策 #1）。**测试**：pytest（`python -m pytest`）。
 - **设计文档的定位**：HOOKS §7 与 MODULES §3.2 等"后续机制"是**设计设想**，M2/实现阶段验证敲定，非必须照抄——保留了实现时的创作自由。
 - **权威进度**：始终以 `docs/PROGRESS.md` 最新一条为准（本节可能滞后）。

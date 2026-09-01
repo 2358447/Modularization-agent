@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-09-01 · M2 第三步完成（拦截者机制·防线 3 + 测试 45）
+
+- **修改指令落地**：`Modify`（frozen dataclass，唯一字段 `append_messages: tuple[Message, ...]`，tuple 防拦截者持有可篡改引用）+ 构造入口 `modify(list)`（自动转 tuple）。`is_terminal()` 恒 False——只给第四步中断指令留家族接口的缝，不预建类型（吸取第一步"预填 10 键"教训）。
+- **三个实现级决策**（讨论后拍板）：① 施加放 emit 循环逐个校验+施加——loop.py 零改动，后续回调天然可见前面的修改（注入先于压缩的顺序保证）；② 角色由返回值隐式区分（None=观察者 / Modify=拦截者 / 其他=脏指令视同非法）；③ 防线 3 最小校验——只验指令本身三条（Modify 实例 / tuple|list 非空 / 每项是 Message），不验全量历史（校验跟着真实用例长）。
+- **防线 3 落地**：`_validate_modify` 非法 → warning（hook + 回调 + 原因）→ 拒绝该拦截者本轮 → 继续广播，绝不 raise。防线 2 补完：拦截者崩溃 = 无指令产生 = 用原始数据继续，与观察者同款，零新代码。
+- **踩坑（review 抓出，测试测不出）**：拒绝日志用 `+` 拼接 `getattr(callback,"__name__",callback)`，其 fallback 是回调对象本身——无名回调（如 `functools.partial`）时 TypeError 冲出 emit、掀翻主循环，恰好击穿防线 1；普通函数测试全绿测不出来。修正为 `%s` 惰性格式化（与防线 1 同款）+ 补 partial 回归测试。教训：日志拼接一律走惰性格式化。
+- **测试**：38 → 45 passed。新增 7 例（is_terminal 契约 / 观察者回归 / 合法施加 / 顺序可见 / 非法指令四连 / 无名回调 / loop 注入进模型输入= RAG 最小原型）；改写 1 例（"返回值被忽略"的前提已被第三步语义取代，留旧断言即假绿）。
+- **收尾**：CHEATSHEET §14 回填（拦截者/修改指令模式）；HOOKS §7 回填"第三步已验证敲定"；ROADMAP 状态表 + AI_ONBOARDING §2 同步。
+
+**下一步**：M2 第四步——中断三意图 SKIP/HALT/REPLACE + 短路规则（HOOKS §D，HALT 落在多工具批次中途须补全 tool_result 占位），届时 emit 演进为返回终止意图供 loop 短路。
+
+---
+
 ## 2026-08-24 · M2 第二步完成（崩溃隔离·防线 1/2 + 测试 + CHEATSHEET 补充）
 
 - **防线 1 落地**：`HookManager.emit` 给每个回调包 `try/except`——单个回调抛异常 → `logger.warning` 记一条（hook_name + 回调名 `getattr(callback,"__name__")` + 异常）→ 跳过继续，其余照常、不掀翻内核。`except Exception` 而非 `BaseException`（Ctrl-C 的 `KeyboardInterrupt` 必须放行）。

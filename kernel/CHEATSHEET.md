@@ -217,7 +217,23 @@
   ```
 - **出现位置**：`kernel/hooks.py` 的 `register` / `emit`。
 
-## 14. 拦截者（Interceptor）模式（M2 步骤 3 引入）
+## 14. 拦截者 / 修改指令模式（M2 第三步）
 
-- **状态**：尚未实现。届时钩子回调可返回"修改指令"（modify/skip/halt/replace），由内核校验后施加；本小节在实现后回填。
-- **设计依据**：HOOKS §A/D（修改指令、三意图中断），实现时验证敲定。
+- **用途**：钩子回调可以**改数据**了——但禁止就地改（不许 `ctx.history = [...]` 直接篡改），必须**返回修改指令**（`Modify`），由内核校验（防线 3）后施加。好处：所有修改经内核之手，"谁、何时、改了什么"可追溯、可拒绝、顺序可控。
+- **最小例子**（RAG 注入原型）：
+  ```python
+  from kernel.hooks import Hook, modify
+
+  def rag_inject(ctx):
+      chunks = retrieve(ctx.history[-1])
+      return modify([Message.text("user", f"[资料] {chunks}")])
+
+  hooks.register(Hook.BEFORE_MODEL_CALL, rag_inject, priority=100)  # 注入段须在压缩段(200)之前
+  ```
+- **关键点**：
+  - **角色由返回值隐式区分**（决策）：返回 `None` = 观察者，返回 `Modify` = 拦截者，其他返回值 = 脏指令视同非法拒绝。
+  - `Modify` 是 frozen dataclass，字段 `append_messages: tuple[Message, ...]`（tuple 防拦截者持有可篡改历史的引用）；构造走 `modify([...])`，list 自动转 tuple。
+  - `is_terminal()` 恒 `False`——第四步的 Skip/Halt/Replace 中断指令共用这个接口，`Modify` 是指令家族的一员。
+  - **逐个施加**：emit 循环里校验一个施加一个，后面的回调天然看到前面的修改（注入先于压缩的顺序保证，HOOKS §7）。
+  - 校验拒绝 = **该拦截者本轮失效**：记 warning 后继续下一个回调，绝不 raise（拒绝路径自身不许炸出 emit，见 HOOKS §7 的 `%s` 教训）。
+- **出现位置**：`kernel/hooks.py`（`Modify` / `modify` / `_validate_modify` / `emit`）、`tests/test_hooks.py`。

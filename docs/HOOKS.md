@@ -164,3 +164,14 @@ for interceptor in sorted_interceptors:
 - **防线 3 落地**：`_validate_modify` 最小校验三条（是 Modify 实例 / append_messages 是 tuple|list 且非空 / 每项是 Message），非法 → warning 记 hook + 回调 + 原因 → 拒绝该指令（拦截者本轮失效）→ 继续下一个回调，绝不 raise。不做全量历史校验（before_model_call 时点 tool_call 配对天然完整，破坏配对的场景出现时再扩展）。
 - **防线 2 补完（语义确认）**：拦截者崩溃 = 没有指令产生 = 用原始数据继续，与观察者的隔离行为天然一致，无需新代码。
 - **实测修正**：拒绝日志最初用字符串 `+` 拼接 `getattr(callback, "__name__", callback)`，其 fallback 是回调对象本身——无 `__name__` 的回调（如 `functools.partial`）会 TypeError 冲出 emit、掀翻主循环，恰好击穿防线 1；普通函数测试全绿测不出来。修正为 `%s` 惰性格式化（与防线 1 同款）并补无名回调回归测试。教训：日志拼接一律走惰性格式化，`+` 拼接 + getattr fallback 是隐性炸点。
+
+### M2 第四步设计结论（2026-09-01 拍板，骨架已就位、**待实现验证**——实现后回填"已验证敲定"）
+
+- **Directive 家族**：Modify/Skip/Halt/Replace 共用基类，`is_terminal()` 分界（False = emit 施加后广播继续；True = 短路广播、指令交还 loop）。第五步错误裁决走"收集-裁决"，不经此短路模型，届时 on_error 另立约定。
+- **分工**：HookManager 书记员（施加 Modify、返回第一个终止意图）；loop 执行者（SKIP 合成拒绝结果 / REPLACE 顶替产物 / HALT 终止）。
+- **短路规则（设想验证中）**：升序执行，第一个终止意图胜出并短路其余；校验非法 → 不短路、记警告、降级继续。
+- **HALT**：`RunHalted` 异常传出，**不回滚历史**；批次中途先补 `tool_result(is_error=True, content="aborted: run halted")` 占位（含触发 HALT 的当前调用）再抛。`_emit` 默认就地 raise，工具批次两点 `halt_raises=False` 延后到分派处。
+- **Replace payload 按钩子点校验**：表驱动（before_tool_call → ToolResultBlock、before_model_call → Response），表到第三行时重构为类型自带知识；after_tool_call 的"改结果"推迟到真实用例出现。
+- **Modify 禁入 before/after_tool_call**（骨架绘制时新发现）：批次中途 history 以 assistant(tool_calls) 结尾、结果未入历史，追加消息会插在 tool_call 与配对结果之间破坏 wire 合法性——防线 3 随用例生长的第一次扩展。
+- **SKIP 拒绝结果**：`is_error=True`、`content="skipped: {reason}"`。
+- **范围**：REPLACE 两点（工具/模型）都做；demo 留 M2 验收（步骤 7）。

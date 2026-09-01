@@ -10,8 +10,8 @@ from __future__ import annotations
 import os
 
 from kernel.context import Context
-from kernel.hooks import Hook, HookManager
-from kernel.message import Message, TextBlock
+from kernel.hooks import Directive, Halt, Hook, HookManager, Replace, Skip
+from kernel.message import Message, TextBlock, ToolResultBlock
 from kernel.providers.base import APIError, Provider, Response
 from kernel.tools import ToolRegistry
 
@@ -25,6 +25,10 @@ DEFAULT_SYSTEM_PROMPT = os.environ.get(
 
 class MaxIterationsError(Exception):
     """单次 run 超过最大迭代次数（安全阀触发，强制停止）。"""
+
+
+class RunHalted(Exception):
+    """拦截者 HALT 终止 run（§D）。不回滚历史——占位补全后历史合法可续跑。"""
 
 
 def _assistant_message(response: Response) -> Message:
@@ -67,16 +71,32 @@ def run(
     Raises:
         APIError: provider 调用失败（本轮已回滚到 run 开始时状态）。
         MaxIterationsError: 迭代超过 max_iter 安全阀。
+        RunHalted: 拦截者发出 HALT（历史已补全占位、保持合法可续跑）。
     """
     if system_prompt is None:
         system_prompt = DEFAULT_SYSTEM_PROMPT
 
-    # M2 第一步：钩子广播入口。闭包捕获 hooks（可为 None）与 ctx，调用点只传钩子名。
-    # 挂载方式已定：hooks 作为 run() 参数（与 provider/tools 平级），不挂 Context。
-    def _emit(hook_name: str) -> None:
-        """广播钩子事件；hooks 为 None 时是空操作（M0/M1 行为）。"""
-        if hooks is not None:
-            hooks.emit(hook_name, ctx)
+    # 钩子广播入口（决策 #12：hooks 作 run() 参数）。M2 第四步：返回终止意图；
+    # Halt 默认就地 raise，工具批次中途两点传 halt_raises=False（先补占位再抛）。
+    def _emit(hook_name: str, *, halt_raises: bool = True) -> Directive | None:
+        """广播钩子事件；返回终止意图（无则 None）。"""
+        directive = hooks.emit(hook_name, ctx) if hooks is not None else None
+        # TODO(M2 第四步·owner)：halt_raises 且是 Halt → raise RunHalted(reason)
+        return directive
+
+    def _halt_tool_batch(
+        executed_results: list[ToolResultBlock],
+        remaining_calls: list,
+        reason: str,
+    ) -> None:
+        """HALT 落在批次中途：已执行结果入历史 → 未执行 calls 补
+        tool_result(is_error=True, content="aborted: run halted") 占位
+        （配对完整、可续跑）→ raise RunHalted(reason)。
+
+        remaining_calls 含触发 HALT 的当前调用（它同样没有结果）。
+        """
+        # TODO(M2 第四步·owner)：本步核心，约 10 行。
+        raise NotImplementedError
 
     # 首次运行时注入 system prompt；若历史已存在则不覆盖。
     if not ctx.history:
@@ -95,7 +115,9 @@ def run(
         ctx.iter_count += 1
 
         _emit(Hook.ON_ITERATION_START)
-        _emit(Hook.BEFORE_MODEL_CALL)
+        directive = _emit(Hook.BEFORE_MODEL_CALL)
+        # TODO(M2 第四步·owner)：Replace → response = payload，跳过 provider.chat
+        #   （无真实调用即无 APIError）；其他非 None → warning 忽略，照常调用。
         try:
             response = provider.chat(
                 ctx.history,
@@ -118,13 +140,22 @@ def run(
             _emit(Hook.ON_RUN_END)
             return response.content or ""
 
-        # 多工具串行执行（HOOKS §C）：每个工具独立走 before/after 钩子；
-        # 结果先收齐，再一起塞回历史（一对一粒度，靠 call_id 配对）。
-        results = []
-        for call in response.tool_calls:
-            _emit(Hook.BEFORE_TOOL_CALL)
+        # 多工具串行（§C）：每工具独立走 before/after 钩子，结果收齐后一起塞回。
+        # 终止意图在此分派；HALT 须先补占位（halt_raises=False）。
+        results: list[ToolResultBlock] = []
+        for idx, call in enumerate(response.tool_calls):
+            directive = _emit(Hook.BEFORE_TOOL_CALL, halt_raises=False)
+            # TODO(M2 第四步·owner)：分派终止意图——
+            #   Skip → result = ToolResultBlock(call_id, is_error=True,
+            #       content=f"skipped: {reason}")，不执行工具；
+            #   Replace → result = payload；
+            #   Halt → _halt_tool_batch(results, response.tool_calls[idx:], reason)；
+            #   其余 → 正常执行工具。
             result = tools.call(call.call_id, call.name, call.arguments)
-            _emit(Hook.AFTER_TOOL_CALL)
+
+            after_directive = _emit(Hook.AFTER_TOOL_CALL, halt_raises=False)
+            # TODO(M2 第四步·owner)：after 点是 Halt →
+            #   _halt_tool_batch(results + [result], tool_calls[idx + 1:], reason)
             results.append(result)
 
         for result in results:

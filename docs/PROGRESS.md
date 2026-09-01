@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-09-01 · M2 第四步设计拍板 + 骨架落地（逻辑待填）
+
+- **五个设计决策**（讨论拍板，全文见 HOOKS §7"第四步设计结论"）：① Skip/Halt/Replace 与 Modify 共用 `Directive` 基类，`is_terminal()` 分界；② 分工——HookManager 书记员（施加 Modify、收集终止意图），loop 执行者（动流程）；③ HALT 用 `RunHalted` 异常传出、**不回滚历史**（可续跑是 HALT 的意义）；④ 批次中途 HALT 先补 `tool_result(is_error)` 占位再抛（`_halt_tool_batch`）；⑤ Replace payload 按钩子点在 emit 校验（表驱动，第三行时重构为类型自带知识）。
+- **骨架绘制时新发现**：Modify 在 before/after_tool_call 会插在 tool_call 与配对结果之间、破坏 wire 合法性 → `_MODIFY_FORBIDDEN_HOOKS` 禁入（防线 3 随用例生长的第一次扩展）；after_tool_call 的"改结果"Replace 推迟到真实用例出现。
+- **骨架内容**：Directive 家族（纯声明）+ 两张校验表 + `emit` 签名改 `Directive | None` + loop 的 `RunHalted` / `_emit(halt_raises=...)` / `_halt_tool_batch` 签名与 docstring。**六处 TODO 待 owner 填**：`_validate_directive`（四条分派）、emit 短路一行、`_emit` 的 Halt 一行、模型点 Replace 短路、工具点 Skip/Replace/Halt 三分派、`_halt_tool_batch`（本步核心，约 10 行）。
+- **预埋的坑（已记录防遗忘）**：first-wins 短路模型**不覆盖**第五步错误裁决（收集-裁决），on_error 届时另立约定（HOOKS §7 标注）。
+- **当前状态**：import 干净；39/45 passed——6 个失败全是依赖 TODO 的拦截者用例，填完即回绿（骨架提交进功能分支，符合"半成品不进 main"）。
+- **杂项**：第四步注释做过一轮精简（设计叙述移入文档，代码只留职责定性 + 防坑提示）；版本树思维导图（本地 HTML，含各里程碑能力与 M4+ 钩子挂载点）已生成给 owner，未入库。
+
+**下一步**：填六处 TODO → pytest 回绿 → 补测试（短路规则/HALT 占位/Replace 两点/Skip 拒绝结果/Modify 禁入）→ 收尾三件套 → M2 还剩第五步（错误裁决）、第六步（trace 事件流）、第七步（验收）。
+
+---
+
 ## 2026-09-01 · M2 第三步完成（拦截者机制·防线 3 + 测试 45）
 
 - **修改指令落地**：`Modify`（frozen dataclass，唯一字段 `append_messages: tuple[Message, ...]`，tuple 防拦截者持有可篡改引用）+ 构造入口 `modify(list)`（自动转 tuple）。`is_terminal()` 恒 False——只给第四步中断指令留家族接口的缝，不预建类型（吸取第一步"预填 10 键"教训）。

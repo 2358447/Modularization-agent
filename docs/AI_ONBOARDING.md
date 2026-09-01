@@ -38,8 +38,8 @@
 
 ## 2. 当前状态速览
 
-- **阶段**：M2 钩子系统进行中（分支 `feat/m2-hooks`）。第一/二/三步已完成：`HookManager`（register/unregister/emit + 优先级升序，决策 #12 挂载方式）+ 崩溃隔离（防线 1/2）+ 拦截者机制（返回 `Modify` 修改指令、防线 3 校验后逐个施加，角色由返回值隐式区分）。全量 45 测试通过。
-- **下一步**：M2 第四步——中断三意图 SKIP/HALT/REPLACE + 短路规则（HOOKS §D），届时 emit 演进为返回终止意图供 loop 短路；分步规划见 PROGRESS 最新一条。
+- **阶段**：M2 钩子系统进行中（分支 `feat/m2-hooks`）。第一/二/三步已完成并全绿（45 tests）；**第四步（中断三意图 SKIP/HALT/REPLACE，HOOKS §D）骨架已落地、核心逻辑待填**——Directive 指令家族 + 两张校验表就位，四处 TODO：`_validate_directive`、emit 短路、模型点 Replace、工具点三分派 + `_halt_tool_batch` 占位补全。当前 39/45 passed，填完即回绿。设计结论见 HOOKS §7"第四步设计结论"（标注待实现验证）。
+- **下一步**：填第四步骨架 TODO → pytest 回绿 → 测试补充 + 收尾三件套；分步规划见 PROGRESS 最新一条。
 - **首个 provider**：OpenAI 兼容（决策 #9）。**内核**：同步实现（决策 #1）。**测试**：pytest（`python -m pytest`）。
 - **设计文档的定位**：HOOKS §7 与 MODULES §3.2 等"后续机制"是**设计设想**，M2/实现阶段验证敲定，非必须照抄——保留了实现时的创作自由。
 - **权威进度**：始终以 `docs/PROGRESS.md` 最新一条为准（本节可能滞后）。
